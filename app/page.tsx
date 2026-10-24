@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Sparkles,
@@ -13,18 +12,9 @@ import {
 } from "lucide-react";
 import { Card } from "./components/Card";
 import { HeroIllustration } from "./components/HeroIllustration";
-import { getCurrentStudent, isTeacherLoggedIn } from "./lib/storage";
 
 export default function HomePage() {
   const router = useRouter();
-
-  useEffect(() => {
-    if (getCurrentStudent()) {
-      router.replace("/siswa");
-    } else if (isTeacherLoggedIn()) {
-      router.replace("/guru");
-    }
-  }, [router]);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 relative overflow-hidden">
@@ -65,7 +55,8 @@ export default function HomePage() {
               Jujur dalam ujian, tumbuh dalam proses belajar
             </p>
             <p className="text-sm lg:text-base text-slate-500 mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed">
-              Platform ujian digital mandiri
+              Ujian digital yang sepenuhnya milik Anda. Tanpa langganan, tanpa
+              ketergantungan.
             </p>
 
             {/* Ilustrasi */}

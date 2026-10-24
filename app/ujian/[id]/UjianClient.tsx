@@ -5,9 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Maximize, Lock } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { getExamById, getCurrentStudent } from "../../lib/storage";
+import { supabase } from "../../lib/supabase"; // IMPORT SUPABASE
 import { getSession, saveSession, clearSession } from "../../lib/session";
-import { saveResult } from "../../lib/results";
+import { fetchExamById, submitResult } from "../../lib/db";
 import type { Exam, ExamSession, Question } from "../../lib/types";
 
 function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
@@ -15,14 +15,12 @@ function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
   const normalize = (s: string) => String(s).trim().toLowerCase();
 
   switch (q.type) {
-    case "multiple_choice":
-      return jawabanSiswa === q.correctAnswer;
+    case "multiple_choice": return jawabanSiswa === q.correctAnswer;
     case "complex_mc":
       if (!Array.isArray(jawabanSiswa) || !q.correctAnswers) return false;
       if (jawabanSiswa.length !== q.correctAnswers.length) return false;
       return jawabanSiswa.every(ans => q.correctAnswers!.includes(ans));
-    case "true_false":
-      return jawabanSiswa === q.trueFalseAnswer;
+    case "true_false": return jawabanSiswa === q.trueFalseAnswer;
     case "multi_true_false":
       if (!q.statements) return false;
       return q.statements.every((st, i) => jawabanSiswa[i] === st.isTrue);
@@ -35,10 +33,8 @@ function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
     case "short_answer":
       const accepted = q.acceptedAnswers || [];
       return accepted.some((a) => normalize(a) === normalize(jawabanSiswa));
-    case "essay":
-      return false; // Esai dinilai manual
-    default:
-      return false;
+    case "essay": return false;
+    default: return false;
   }
 }
 
@@ -48,6 +44,7 @@ export function UjianClient() {
   const router = useRouter();
 
   const [exam, setExam] = useState<Exam | null>(null);
+  const [loading, setLoading] = useState(true);
   const [nama, setNama] = useState("");
   const [nomorSoal, setNomorSoal] = useState(0);
   const [jawaban, setJawaban] = useState<Record<string, any>>({});
@@ -63,31 +60,48 @@ export function UjianClient() {
   const violationsRef = useRef(0);
   const skipAutoSaveRef = useRef(true);
 
+  // Ambil data ujian dan profil siswa dari Supabase
   useEffect(() => {
-    const found = getExamById(examId);
-    if (!found || !found.isActive) { router.push("/siswa"); return; }
-    
-    const student = getCurrentStudent();
-    if (!student) { router.push("/siswa/login"); return; }
-    
-    setExam(found);
-    setNama(student.fullName);
+    async function loadExam() {
+      // 1. Cek Login dari Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/siswa/login"); return; }
 
-    const existing = getSession(examId);
-    if (existing && existing.studentName === student.fullName) {
-      setJawaban(existing.answers);
-      setViolations(existing.violations);
-      violationsRef.current = existing.violations;
-      const elapsed = Math.floor((Date.now() - new Date(existing.startedAt).getTime()) / 1000);
-      setSisaWaktu(Math.max(0, found.duration - elapsed));
-      setIsResume(true);
-    } else {
-      saveSession({
-        examId, studentId: student.id, studentName: student.fullName,
-        answers: {}, startedAt: new Date().toISOString(), violations: 0, lastUpdated: new Date().toISOString()
-      });
-      setSisaWaktu(found.duration);
+      // 2. Ambil Nama Siswa dari tabel users
+      const { data: profile } = await supabase
+        .from("users")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile) { router.push("/siswa/login"); return; }
+
+      // 3. Ambil Data Ujian
+      const found = await fetchExamById(examId);
+      if (!found || !found.isActive) { router.push("/siswa"); return; }
+      
+      setExam(found);
+      setNama(profile.full_name);
+
+      // 4. Cek Sesi Pengerjaan di localStorage (untuk auto-save)
+      const existing = getSession(examId);
+      if (existing && existing.studentName === profile.full_name) {
+        setJawaban(existing.answers);
+        setViolations(existing.violations);
+        violationsRef.current = existing.violations;
+        const elapsed = Math.floor((Date.now() - new Date(existing.startedAt).getTime()) / 1000);
+        setSisaWaktu(Math.max(0, found.duration - elapsed));
+        setIsResume(true);
+      } else {
+        saveSession({
+          examId, studentId: user.id, studentName: profile.full_name,
+          answers: {}, startedAt: new Date().toISOString(), violations: 0, lastUpdated: new Date().toISOString()
+        });
+        setSisaWaktu(found.duration);
+      }
+      setLoading(false);
     }
+    loadExam();
   }, [examId, router]);
 
   useEffect(() => {
@@ -134,7 +148,7 @@ export function UjianClient() {
     setJawaban(prev => ({ ...prev, [soalId]: value }));
   }
 
-  function submitExam(auto = false) {
+  async function submitExam(auto = false) {
     if (!exam) return;
     if (!auto) {
       const belum = exam.questions.filter(q => jawaban[q.id] === undefined || (Array.isArray(jawaban[q.id]) && jawaban[q.id].length === 0) || jawaban[q.id] === "").length;
@@ -146,17 +160,22 @@ export function UjianClient() {
     exam.questions.forEach(q => { if (isJawabanBenar(q, jawaban[q.id])) benar++; });
     const nilai = Math.round((benar / exam.questions.length) * 100);
 
-    localStorage.setItem("hasilUjian", JSON.stringify({
-      nama, examTitle: exam.title, benar, total: exam.questions.length, nilai, violations: violationsRef.current
-    }));
-
-    const student = getCurrentStudent();
-    if (student) {
-      saveResult({
+    // Simpan Hasil ke Supabase
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      // Ambil class_name dari profil
+      const { data: profile } = await supabase.from("users").select("class_name").eq("id", user.id).single();
+      
+      await submitResult({
         id: crypto.randomUUID(), examId: exam.id, examTitle: exam.title,
-        studentId: student.id, studentName: student.fullName, className: student.className,
+        studentId: user.id, studentName: nama, className: profile?.class_name || "-",
         score: nilai, correct: benar, total: exam.questions.length, violations: violationsRef.current, submittedAt: new Date().toISOString()
       });
+
+      // Simpan untuk tampilan halaman hasil
+      localStorage.setItem("hasilUjian", JSON.stringify({
+        nama, examTitle: exam.title, benar, total: exam.questions.length, nilai, violations: violationsRef.current
+      }));
     }
 
     clearSession(examId);
@@ -164,7 +183,9 @@ export function UjianClient() {
     router.push("/hasil");
   }
 
-  if (!exam) return null;
+  if (loading || !exam) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Memuat ujian...</p></div>;
+  }
 
   if (showStartPrompt) {
     return (
@@ -213,7 +234,6 @@ export function UjianClient() {
           {soal.image && <img src={soal.image} className="max-h-64 mb-4 rounded-xl border" />}
 
           <div className="space-y-4">
-            {/* 1. PG TUNGGAL */}
             {soal.type === "multiple_choice" && soal.options?.map((opt, i) => {
               const identifier = opt || `Opsi ${i+1}`;
               const img = soal.optionImages?.[i];
@@ -226,7 +246,6 @@ export function UjianClient() {
               );
             })}
 
-            {/* 2. PG KOMPLEKS */}
             {soal.type === "complex_mc" && soal.options?.map((opt, i) => {
               const identifier = opt || `Opsi ${i+1}`;
               const img = soal.optionImages?.[i];
@@ -243,7 +262,6 @@ export function UjianClient() {
               );
             })}
 
-            {/* 3. B/S TUNGGAL */}
             {soal.type === "true_false" && (
               <div className="grid grid-cols-2 gap-3">
                 {[true, false].map(val => (
@@ -252,7 +270,6 @@ export function UjianClient() {
               </div>
             )}
 
-            {/* 4. B/S BERTINGKAT */}
             {soal.type === "multi_true_false" && soal.statements?.map((st, i) => {
               const curr = ans || {};
               return (
@@ -266,7 +283,6 @@ export function UjianClient() {
               );
             })}
 
-            {/* 5. MENJODOHKAN */}
             {soal.type === "matching" && (
               <div className="space-y-3">
                 {soal.pairs?.map((p, i) => {
@@ -284,7 +300,6 @@ export function UjianClient() {
               </div>
             )}
 
-            {/* 6. MENGURUTKAN */}
             {soal.type === "ordering" && (
               <div className="space-y-2">
                 {(ans && Array.isArray(ans) ? ans : soal.items || []).map((item, i, arr) => (
@@ -300,12 +315,10 @@ export function UjianClient() {
               </div>
             )}
 
-            {/* 7. ISIAN SINGKAT */}
             {soal.type === "short_answer" && (
               <input type="text" value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban..." className="w-full p-4 border-2 rounded-xl text-lg focus:border-blue-500 focus:outline-none" />
             )}
 
-            {/* 8. ESAI */}
             {soal.type === "essay" && (
               <div>
                 <textarea rows={6} value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban panjang Anda di sini..." className="w-full p-4 border-2 rounded-xl text-base focus:border-blue-500 focus:outline-none resize-none" />

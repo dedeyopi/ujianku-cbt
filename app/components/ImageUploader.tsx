@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { X, Upload, AlertCircle } from "lucide-react";
-import { compressImage, estimateSize } from "../lib/image";
+import { compressImage } from "../lib/image";
+import { supabase } from "../lib/supabase";
 
 type Props = {
   value?: string;
@@ -29,12 +30,36 @@ export function ImageUploader({ value, onChange }: Props) {
 
     setError("");
     setLoading(true);
+    
     try {
-      const compressed = await compressImage(file, 800, 0.75);
-      onChange(compressed);
-    } catch {
-      setError("Gagal memproses gambar.");
+      // 1. Kompres gambar terlebih dahulu
+      const base64 = await compressImage(file, 800, 0.75);
+      
+      // 2. Ubah base64 menjadi Blob untuk di-upload
+      const res = await fetch(base64);
+      const blob = await res.blob();
+      
+      // 3. Buat nama file unik
+      const fileName = `${crypto.randomUUID()}.jpg`;
+      
+      // 4. Upload ke Supabase Storage (bucket: exam-images)
+      const { error: uploadError } = await supabase.storage
+        .from("exam-images")
+        .upload(fileName, blob, { contentType: "image/jpeg" });
+
+      if (uploadError) throw uploadError;
+
+      // 5. Ambil URL publik gambar
+      const { data: { publicUrl } } = supabase.storage
+        .from("exam-images")
+        .getPublicUrl(fileName);
+
+      onChange(publicUrl); // Kembalikan URL, bukan base64
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Gagal mengunggah gambar ke server.");
     }
+    
     setLoading(false);
   }
 
@@ -56,9 +81,6 @@ export function ImageUploader({ value, onChange }: Props) {
             <X className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-xs text-slate-400 mt-1.5">
-          Ukuran: {estimateSize(value)}
-        </p>
       </div>
     );
   }
@@ -73,7 +95,7 @@ export function ImageUploader({ value, onChange }: Props) {
         }`}
       >
         <Upload className="w-4 h-4" />
-        {loading ? "Memproses gambar..." : "Upload Gambar (Opsional)"}
+        {loading ? "Mengunggah ke server..." : "Upload Gambar (Opsional)"}
         <input
           type="file"
           accept="image/*"
@@ -89,9 +111,8 @@ export function ImageUploader({ value, onChange }: Props) {
           {error}
         </div>
       )}
-
       <p className="text-xs text-slate-400 mt-1.5">
-        Otomatis dikompresi ke maks 800px. Format JPG/PNG.
+        Format JPG/PNG. Gambar akan disimpan di server aman.
       </p>
     </div>
   );

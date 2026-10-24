@@ -11,7 +11,8 @@ import { Button } from "./Button";
 import { Card } from "./Card";
 import { Input } from "./Input";
 import { ImageUploader } from "./ImageUploader";
-import { getExamById, saveExam, isTeacherLoggedIn } from "../lib/storage";
+import { fetchExamById, saveExam } from "../lib/db";
+import { isLoggedIn } from "../lib/auth";
 import { downloadTemplateImport, parseExcelToQuestions } from "../lib/excel";
 import type { Exam, Question, QuestionType } from "../lib/types";
 
@@ -33,7 +34,7 @@ function createEmptyQuestion(type: QuestionType): Question {
   if (type === "matching") return { ...base, pairs: [{ left: "", right: "" }, { left: "", right: "" }] };
   if (type === "ordering") return { ...base, items: ["", "", ""] };
   if (type === "short_answer") return { ...base, acceptedAnswers: [""] };
-  return base; // essay
+  return base;
 }
 
 const TIPE_SOAL: { value: QuestionType; label: string; icon: any }[] = [
@@ -56,6 +57,8 @@ const TIPE_LABEL: Record<QuestionType, string> = {
 export function ExamEditor({ examId }: Props) {
   const router = useRouter();
   const [exam, setExam] = useState<Exam | null>(null);
+  const [loading, setLoading] = useState(true);
+  
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [isNewQuestion, setIsNewQuestion] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -64,22 +67,42 @@ export function ExamEditor({ examId }: Props) {
   const [showOptImage, setShowOptImage] = useState<Record<number, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Ambil data awal
   useEffect(() => {
-    if (!isTeacherLoggedIn()) { router.push("/guru/login"); return; }
-    if (examId) {
-      const found = getExamById(examId);
-      if (!found) { router.push("/guru"); return; }
-      setExam(found);
-    } else setExam(createEmptyExam());
+    async function loadData() {
+      const logged = await isLoggedIn();
+      if (!logged) { router.push("/guru/login"); return; }
+
+      if (examId) {
+        const found = await fetchExamById(examId);
+        if (!found) { router.push("/guru"); return; }
+        setExam(found);
+      } else {
+        setExam(createEmptyExam());
+      }
+      setLoading(false);
+    }
+    loadData();
   }, [examId, router]);
 
+  // Auto-save ke Supabase dengan debounce 1 detik
   useEffect(() => {
-    if (!exam) return;
-    if (exam.title.trim() !== "" || exam.questions.length > 0) saveExam(exam);
-  }, [exam]);
+    if (!exam || loading) return;
+    const hasContent = exam.title.trim() !== "" || exam.questions.length > 0;
+    if (!hasContent) return;
+
+    const timer = setTimeout(async () => {
+      const success = await saveExam(exam);
+      if (success) {
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 1500);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [exam, loading]);
 
   function updateExam(patch: Partial<Exam>) { if (exam) setExam({ ...exam, ...patch }); }
-  function flashSaved() { setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1500); }
   function pilihTipeSoal(type: QuestionType) { setEditingQuestion(createEmptyQuestion(type)); setIsNewQuestion(true); setPilihTipe(false); setShowOptImage({}); }
   function cancelQuestionForm() { setEditingQuestion(null); setIsNewQuestion(false); setPilihTipe(false); setShowOptImage({}); }
   function openEditQuestion(q: Question) { setEditingQuestion(JSON.parse(JSON.stringify(q))); setIsNewQuestion(false); setShowOptImage({}); }
@@ -90,7 +113,6 @@ export function ExamEditor({ examId }: Props) {
     
     if (editingQuestion.type === "multiple_choice" || editingQuestion.type === "complex_mc") {
        const opts = editingQuestion.options || [];
-       // Cek apakah ada opsi yang benar-benar kosong (tidak ada teks & tidak ada gambar)
        const hasEmptyOpt = opts.some((opt, i) => !opt.trim() && !editingQuestion.optionImages?.[i]);
        if (hasEmptyOpt) return alert("Semua pilihan harus diisi teks atau gambarnya.");
     }
@@ -98,7 +120,7 @@ export function ExamEditor({ examId }: Props) {
     if (isNewQuestion) updateExam({ questions: [...exam.questions, editingQuestion] });
     else updateExam({ questions: exam.questions.map((q) => q.id === editingQuestion.id ? editingQuestion : q) });
     
-    setEditingQuestion(null); setIsNewQuestion(false); setShowOptImage({}); flashSaved();
+    setEditingQuestion(null); setIsNewQuestion(false); setShowOptImage({}); 
   }
 
   function deleteQuestion(id: string) {
@@ -113,12 +135,14 @@ export function ExamEditor({ examId }: Props) {
     try {
       const imported = await parseExcelToQuestions(file);
       updateExam({ questions: [...exam.questions, ...imported] });
-      alert(`Berhasil mengimpor ${imported.length} soal!`); flashSaved();
+      alert(`Berhasil mengimpor ${imported.length} soal!`);
     } catch (err) { alert("Gagal mengimpor."); }
     setIsImporting(false);
   }
 
-  if (!exam) return null;
+  if (loading || !exam) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Memuat editor...</p></div>;
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
@@ -196,7 +220,6 @@ export function ExamEditor({ examId }: Props) {
                   <p className="font-medium text-slate-900 mb-2">{q.question}</p>
                   {q.image && <img src={q.image} className="max-h-24 rounded-lg border border-slate-200 mb-2" />}
                   
-                  {/* Ringkasan Jawaban Berdasarkan Tipe */}
                   {q.type === "multiple_choice" && <div className="text-xs text-emerald-600">Kunci: {q.correctAnswer}</div>}
                   {q.type === "complex_mc" && <div className="text-xs text-emerald-600">Kunci: {q.correctAnswers?.join(", ")}</div>}
                   {q.type === "true_false" && <div className="text-xs text-emerald-600">Kunci: {q.trueFalseAnswer ? "Benar" : "Salah"}</div>}
@@ -213,7 +236,6 @@ export function ExamEditor({ examId }: Props) {
             </Card>
           ))}
 
-          {/* FORM EDIT SOAL */}
           {editingQuestion && (
             <Card className="p-5 mt-3 border-emerald-200 ring-1 ring-emerald-500/20 animate-fade-in-up">
               <div className="flex justify-between items-center mb-4">
@@ -228,7 +250,6 @@ export function ExamEditor({ examId }: Props) {
                 </div>
                 <ImageUploader value={editingQuestion.image} onChange={(img) => setEditingQuestion({ ...editingQuestion, image: img })} />
 
-                {/* 1. PG TUNGGAL */}
                 {editingQuestion.type === "multiple_choice" && (
                   <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
                     {editingQuestion.options?.map((opt, i) => (
@@ -248,7 +269,6 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 )}
 
-                {/* 2. PG KOMPLEKS */}
                 {editingQuestion.type === "complex_mc" && (
                   <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
                     <p className="text-xs text-slate-500">Centang lebih dari satu jika perlu.</p>
@@ -277,7 +297,6 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 )}
 
-                {/* 3. B/S TUNGGAL */}
                 {editingQuestion.type === "true_false" && (
                   <div className="flex gap-3">
                     {[true, false].map(val => (
@@ -286,7 +305,6 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 )}
 
-                {/* 4. B/S BERTINGKAT */}
                 {editingQuestion.type === "multi_true_false" && (
                   <div className="space-y-3">
                     {editingQuestion.statements?.map((st, i) => (
@@ -302,7 +320,6 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 )}
 
-                {/* 5. MENJODOHKAN */}
                 {editingQuestion.type === "matching" && (
                   <div className="space-y-3">
                     {editingQuestion.pairs?.map((p, i) => (
@@ -317,7 +334,6 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 )}
 
-                {/* 6. MENGURUTKAN */}
                 {editingQuestion.type === "ordering" && (
                   <div className="space-y-2">
                     <p className="text-xs text-slate-500">Masukkan item sesuai urutan yang BENAR.</p>
@@ -332,7 +348,6 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 )}
 
-                {/* 7. ISIAN SINGKAT */}
                 {editingQuestion.type === "short_answer" && (
                   <div className="space-y-2">
                     <p className="text-xs text-slate-500">Diterima (pisahkan dengan enter/koma).</p>
@@ -346,7 +361,6 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 )}
 
-                {/* 8. ESAI */}
                 {editingQuestion.type === "essay" && (
                   <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-sm text-amber-800">
                     Soal esai tidak dinilai otomatis. Siswa akan mengetik jawaban panjang. Guru harus memeriksa dan menilai manual.
