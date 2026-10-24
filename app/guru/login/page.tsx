@@ -1,0 +1,140 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Lock, ArrowRight, AlertCircle, User, Sparkles } from "lucide-react";
+import { Button } from "../../components/Button";
+import { Card } from "../../components/Card";
+import { Input } from "../../components/Input";
+import { teacherLogin } from "../../lib/storage";
+
+export default function LoginGuruPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const router = useRouter();
+
+  function handleLogin() {
+    if (username.trim() === "" || password === "") {
+      setError("Username dan kata sandi harus diisi.");
+      return;
+    }
+    if (teacherLogin(username, password)) {
+      router.push("/guru");
+    } else {
+      setError("Username atau kata sandi salah.");
+      setPassword("");
+    }
+  }
+
+  return (
+    <main className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-900">
+      {/* Ornamen background hijau */}
+      <div className="absolute top-[-100px] left-[-100px] w-80 h-80 rounded-full bg-emerald-500/20 blur-3xl"></div>
+      <div className="absolute bottom-[-120px] right-[-80px] w-96 h-96 rounded-full bg-teal-500/20 blur-3xl"></div>
+      <div
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage:
+            "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }}
+      ></div>
+
+      <div className="w-full max-w-md relative animate-fade-in-up">
+        {/* Brand UjianKu */}
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center gap-2.5 mb-3">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-900/50 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight">
+              Ujian<span className="text-emerald-400">Ku</span>
+            </h1>
+          </div>
+          <p className="text-emerald-200/60 text-xs font-medium">
+            Jujur dalam ujian, tumbuh dalam proses belajar
+          </p>
+        </div>
+
+        {/* Panel Guru */}
+        <div className="text-center mb-5">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-white text-xs font-semibold">
+            <Lock className="w-3.5 h-3.5" />
+            Panel Guru
+          </div>
+        </div>
+
+        <Card className="p-6 backdrop-blur-sm bg-white/95">
+          <div className="space-y-4">
+            <div className="relative">
+              <Input
+                id="username"
+                label="Username"
+                placeholder="Masukkan username"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setError("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                autoFocus
+              />
+              <User className="w-4 h-4 text-slate-300 absolute right-3 top-10 pointer-events-none" />
+            </div>
+
+            <Input
+              id="password"
+              label="Kata Sandi"
+              type="password"
+              placeholder="Masukkan kata sandi"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError("");
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 mt-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {error}
+            </div>
+          )}
+
+          <button
+            onClick={handleLogin}
+            className="w-full mt-5 inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] px-6 py-3.5 text-base bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-600/20"
+          >
+            Masuk
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </button>
+
+          <div className="mt-5 pt-5 border-t border-slate-100 text-center">
+            <p className="text-xs text-slate-400">
+              Akun sementara:{" "}
+              <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600">
+                guru
+              </code>{" "}
+              /{" "}
+              <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600">
+                guru123
+              </code>
+            </p>
+          </div>
+        </Card>
+
+        <div className="text-center mt-6">
+          <a
+            href="/"
+            className="text-xs text-emerald-200/70 hover:text-white transition"
+          >
+            ← Kembali ke beranda
+          </a>
+        </div>
+      </div>
+    </main>
+  );
+}
