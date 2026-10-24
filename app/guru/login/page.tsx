@@ -96,9 +96,6 @@ export default function LoginGuruPage() {
             {loading ? "Memeriksa..." : "Masuk"} <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
 
-          <div className="mt-5 pt-5 border-t border-slate-100 text-center">
-            <p className="text-xs text-slate-400">Akun uji: <code className="bg-slate-100 px-1.5 py-0.5 rounded">guru</code> / <code className="bg-slate-100 px-1.5 py-0.5 rounded">guru123</code></p>
-          </div>
         </Card>
 
         <div className="text-center mt-6">
