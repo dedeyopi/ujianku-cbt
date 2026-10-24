@@ -55,8 +55,7 @@ export default function HomePage() {
               Jujur dalam ujian, tumbuh dalam proses belajar
             </p>
             <p className="text-sm lg:text-base text-slate-500 mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed">
-              Ujian digital yang sepenuhnya milik Anda. Tanpa langganan, tanpa
-              ketergantungan.
+              "Platform asesmen modern yang mengedepankan integritas dan kemudahan dalam proses belajar mengajar."
             </p>
 
             {/* Ilustrasi */}
