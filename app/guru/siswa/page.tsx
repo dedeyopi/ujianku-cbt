@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, Users, X, Save, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Users, X, Save, AlertCircle, Upload, FileSpreadsheet, Download } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Input } from "../../components/Input";
-import { isLoggedIn, createStudentAuth } from "../../lib/auth";
+import { isLoggedIn } from "../../lib/auth";
 import { supabase } from "../../lib/supabase";
+import { downloadTemplateSiswa, parseExcelSiswa } from "../../lib/excel";
+import { bulkImportStudents } from "../../actions/importStudents"; // Import Server Action
 import type { Student } from "../../lib/types";
 
 export default function KelolaSiswaPage() {
@@ -16,8 +18,10 @@ export default function KelolaSiswaPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [form, setForm] = useState({ username: "", password: "", fullName: "", className: "" });
   const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function fetchStudents() {
     const { data, error } = await supabase
@@ -28,7 +32,7 @@ export default function KelolaSiswaPage() {
       
     if (!error && data) {
       setStudents(data.map((s: any) => ({
-        id: s.id, username: s.username, password: "********", // Sembunyikan password asli
+        id: s.id, username: s.username, password: "********",
         fullName: s.full_name, className: s.class_name, createdAt: s.created_at
       })));
     }
@@ -56,31 +60,49 @@ export default function KelolaSiswaPage() {
       setError("Username, kata sandi, dan nama lengkap wajib diisi.");
       return;
     }
-
     setIsSaving(true);
-    const res = await createStudentAuth(form.username, form.password, form.fullName, form.className);
     
-    if (res.success) {
-      // Perbarui profil di public.users (karena trigger mungkin belum menyertakan class_name)
-      if (res.user) {
-         await supabase.from("users").update({
-           full_name: form.fullName,
-           class_name: form.className
-         }).eq("id", res.user.id);
-      }
-      
+    // Kita gunakan fungsi bulkImportStudents untuk 1 siswa juga agar kodenya konsisten
+    const res = await bulkImportStudents([{
+      username: form.username,
+      password: form.password,
+      fullName: form.fullName,
+      className: form.className
+    }]);
+
+    if (res.success > 0) {
       await fetchStudents();
       resetForm();
     } else {
-      setError(res.message || "Gagal membuat akun siswa.");
+      setError(res.errors[0] || "Gagal membuat akun siswa.");
     }
     setIsSaving(false);
   }
 
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; 
+    e.target.value = "";
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const parsed = await parseExcelSiswa(file);
+      if (parsed.length === 0) {
+        alert("Tidak ada data siswa valid yang ditemukan.");
+      } else {
+        // Panggil Server Action
+        const res = await bulkImportStudents(parsed);
+        alert(`Import Selesai!\nBerhasil: ${res.success} siswa\nGagal: ${res.failed} siswa\n\n${res.errors.join('\n')}`);
+        await fetchStudents();
+      }
+    } catch (err: any) {
+      alert(err.message || "Gagal memproses file.");
+    }
+    setIsImporting(false);
+  }
+
   async function handleDelete(s: Student) {
     if (!confirm(`Hapus akun siswa "${s.fullName}"?`)) return;
-    
-    // Hapus dari tabel public.users (Auth user tidak bisa dihapus dari client-side tanpa service key)
     await supabase.from("users").delete().eq("id", s.id);
     await fetchStudents();
   }
@@ -102,16 +124,27 @@ export default function KelolaSiswaPage() {
       </header>
 
       <div className="max-w-4xl mx-auto px-6 pt-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Daftar Siswa ({students.length})</h2>
             <p className="text-sm text-slate-500">Data tersimpan aman di Supabase Cloud</p>
           </div>
-          {!showForm && (
-            <button onClick={() => setShowForm(true)} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
-              <Plus className="w-4 h-4 mr-1.5" />Tambah Siswa
-            </button>
-          )}
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="secondary" size="sm" onClick={downloadTemplateSiswa}>
+              <FileSpreadsheet className="w-4 h-4 mr-1.5 text-emerald-600" />Template
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+              <Upload className="w-4 h-4 mr-1.5 text-blue-600" />{isImporting ? "Memproses..." : "Import Excel"}
+            </Button>
+            <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleImport} />
+            
+            {!showForm && (
+              <button onClick={() => setShowForm(true)} className="inline-flex items-center justify-center font-semibold rounded-xl px-3 py-1.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+                <Plus className="w-4 h-4 mr-1.5" />Tambah Manual
+              </button>
+            )}
+          </div>
         </div>
 
         {showForm && (

@@ -184,3 +184,43 @@ export function exportResultsToExcel(results: ExamResult[], examTitle: string) {
   const safeTitle = examTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase();
   XLSX.writeFile(wb, `Hasil_${safeTitle}.xlsx`);
 }
+
+// --- IMPORT SISWA ---
+export function downloadTemplateSiswa() {
+  const template = [
+    { username: "deyo", password: "123456", full_name: "Dede Yopi", class_name: "9I" },
+    { username: "budi", password: "123456", full_name: "Budi Santoso", class_name: "9A" },
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(template);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Template Siswa");
+  XLSX.writeFile(wb, "Template_Import_Siswa.xlsx");
+}
+
+export async function parseExcelSiswa(file: File): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(firstSheet) as any[];
+
+        const students = rows.map((row) => ({
+          username: String(row["username"] || "").trim(),
+          password: String(row["password"] || "123456").trim(),
+          fullName: String(row["full_name"] || "").trim(),
+          className: String(row["class_name"] || "").trim(),
+        })).filter(s => s.username && s.fullName); // Filter data kosong
+
+        resolve(students);
+      } catch {
+        reject(new Error("Gagal membaca file Excel."));
+      }
+    };
+    reader.onerror = () => reject(new Error("Gagal membaca file."));
+    reader.readAsArrayBuffer(file);
+  });
+}
