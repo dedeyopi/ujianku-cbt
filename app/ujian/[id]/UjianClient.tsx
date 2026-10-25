@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Maximize, Lock } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { supabase } from "../../lib/supabase"; // IMPORT SUPABASE
+import { supabase } from "../../lib/supabase";
 import { getSession, saveSession, clearSession } from "../../lib/session";
 import { fetchExamById, submitResult } from "../../lib/db";
 import type { Exam, ExamSession, Question } from "../../lib/types";
@@ -60,30 +60,20 @@ export function UjianClient() {
   const violationsRef = useRef(0);
   const skipAutoSaveRef = useRef(true);
 
-  // Ambil data ujian dan profil siswa dari Supabase
   useEffect(() => {
     async function loadExam() {
-      // 1. Cek Login dari Supabase
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/siswa/login"); return; }
 
-      // 2. Ambil Nama Siswa dari tabel users
-      const { data: profile } = await supabase
-        .from("users")
-        .select("full_name")
-        .eq("id", user.id)
-        .single();
-
+      const { data: profile } = await supabase.from("users").select("full_name").eq("id", user.id).single();
       if (!profile) { router.push("/siswa/login"); return; }
 
-      // 3. Ambil Data Ujian
       const found = await fetchExamById(examId);
       if (!found || !found.isActive) { router.push("/siswa"); return; }
       
       setExam(found);
       setNama(profile.full_name);
 
-      // 4. Cek Sesi Pengerjaan di localStorage (untuk auto-save)
       const existing = getSession(examId);
       if (existing && existing.studentName === profile.full_name) {
         setJawaban(existing.answers);
@@ -160,19 +150,14 @@ export function UjianClient() {
     exam.questions.forEach(q => { if (isJawabanBenar(q, jawaban[q.id])) benar++; });
     const nilai = Math.round((benar / exam.questions.length) * 100);
 
-    // Simpan Hasil ke Supabase
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      // Ambil class_name dari profil
       const { data: profile } = await supabase.from("users").select("class_name").eq("id", user.id).single();
-      
       await submitResult({
         id: crypto.randomUUID(), examId: exam.id, examTitle: exam.title,
         studentId: user.id, studentName: nama, className: profile?.class_name || "-",
         score: nilai, correct: benar, total: exam.questions.length, violations: violationsRef.current, submittedAt: new Date().toISOString()
       });
-
-      // Simpan untuk tampilan halaman hasil
       localStorage.setItem("hasilUjian", JSON.stringify({
         nama, examTitle: exam.title, benar, total: exam.questions.length, nilai, violations: violationsRef.current
       }));
@@ -230,7 +215,9 @@ export function UjianClient() {
             <p className="text-sm font-semibold text-slate-500">Soal {nomorSoal + 1} / {exam.questions.length}</p>
             {savedFlash && <span className="text-xs text-emerald-600">Tersimpan</span>}
           </div>
-          <h2 className="text-lg font-semibold mb-4">{soal.question}</h2>
+          {/* Render Pertanyaan sebagai HTML */}
+          <div className="text-lg font-semibold mb-4 prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: soal.question }} />
+          
           {soal.image && <img src={soal.image} className="max-h-64 mb-4 rounded-xl border" />}
 
           <div className="space-y-4">
@@ -241,7 +228,8 @@ export function UjianClient() {
                 <button key={i} onClick={() => updateJawaban(soal.id, identifier)} className={`w-full text-left p-3 rounded-xl border-2 flex items-center gap-3 transition ${ans === identifier ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"}`}>
                   <span className="w-7 h-7 rounded-full bg-white border flex items-center justify-center font-bold shrink-0">{String.fromCharCode(65+i)}</span>
                   {img && <img src={img} className="h-16 object-contain rounded border bg-white" alt={`Opsi ${i+1}`} />}
-                  {opt && <span className="font-medium">{opt}</span>}
+                  {/* Render Opsi sebagai HTML */}
+                  <div className="font-medium prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: opt }} />
                 </button>
               );
             })}
@@ -257,7 +245,7 @@ export function UjianClient() {
                 }} className={`w-full text-left p-3 rounded-xl border-2 flex items-center gap-3 transition ${selected ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"}`}>
                   <div className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 ${selected ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300"}`}>{selected && <CheckCircle2 className="w-4 h-4"/>}</div>
                   {img && <img src={img} className="h-16 object-contain rounded border bg-white" alt={`Opsi ${i+1}`} />}
-                  {opt && <span className="font-medium">{opt}</span>}
+                  <div className="font-medium prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: opt }} />
                 </button>
               );
             })}
@@ -274,7 +262,7 @@ export function UjianClient() {
               const curr = ans || {};
               return (
                 <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border rounded-xl gap-3">
-                  <p className="text-sm flex-1">{st.text}</p>
+                  <div className="text-sm flex-1 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: st.text }} />
                   <div className="flex gap-2">
                     <button onClick={() => updateJawaban(soal.id, {...curr, [i]: true})} className={`px-4 py-2 rounded-lg border-2 text-sm font-semibold ${curr[i] === true ? "bg-emerald-50 border-emerald-500 text-emerald-700" : "border-slate-200"}`}>Benar</button>
                     <button onClick={() => updateJawaban(soal.id, {...curr, [i]: false})} className={`px-4 py-2 rounded-lg border-2 text-sm font-semibold ${curr[i] === false ? "bg-red-50 border-red-500 text-red-700" : "border-slate-200"}`}>Salah</button>
@@ -289,10 +277,12 @@ export function UjianClient() {
                   const curr = ans || {};
                   return (
                     <div key={i} className="flex flex-col sm:flex-row gap-2 items-center">
-                      <div className="flex-1 w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm">{p.left}</div>
+                      {/* Render Kiri sebagai HTML */}
+                      <div className="flex-1 w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: p.left }} />
                       <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-3 rounded-xl border-2 border-slate-200 bg-white text-sm focus:border-blue-500">
                         <option value="" disabled>-- Pilih Pasangan --</option>
-                        {soal.pairs?.map(pr => <option key={pr.right} value={pr.right}>{pr.right}</option>)}
+                        {/* Untuk dropdown, kita hilangkan tag HTML agar tampil rapi */}
+                        {soal.pairs?.map(pr => <option key={pr.right} value={pr.right}>{pr.right.replace(/<[^>]*>?/gm, '')}</option>)}
                       </select>
                     </div>
                   );
@@ -305,7 +295,8 @@ export function UjianClient() {
                 {(ans && Array.isArray(ans) ? ans : soal.items || []).map((item, i, arr) => (
                   <div key={i} className="flex gap-2 items-center p-2 bg-white border rounded-xl">
                     <span className="w-6 text-center font-bold text-slate-400">{i+1}</span>
-                    <span className="flex-1 text-sm">{item}</span>
+                    {/* Render item sebagai HTML */}
+                    <div className="flex-1 text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item }} />
                     <div className="flex flex-col gap-1">
                       <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className="p-1 bg-slate-100 rounded hover:bg-slate-200 disabled:opacity-30">▲</button>
                       <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className="p-1 bg-slate-100 rounded hover:bg-slate-200 disabled:opacity-30">▼</button>
