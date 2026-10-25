@@ -224,3 +224,34 @@ export async function parseExcelSiswa(file: File): Promise<any[]> {
     reader.readAsArrayBuffer(file);
   });
 }
+
+// --- EXPORT ANALISIS BUTIR SOAL ---
+export function exportQuestionAnalysisToExcel(analysisData: any[], examTitle: string, totalStudents: number) {
+  const dataToExport = analysisData.map((qa, i) => ({
+    No: i + 1,
+    "Tipe Soal": qa.question.type.replace("_", " ").toUpperCase(),
+    Pertanyaan: qa.question.question.replace(/<[^>]*>?/gm, ''), // Hilangkan tag HTML agar rapi
+    "Jumlah Benar": qa.correctCount,
+    "Total Siswa": totalStudents,
+    Persentase: `${qa.percentage}%`,
+    Kategori: qa.kategori,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(dataToExport);
+  
+  ws["!cols"] = [
+    { wch: 5 },  // No
+    { wch: 15 }, // Tipe
+    { wch: 50 }, // Pertanyaan
+    { wch: 12 }, // Benar
+    { wch: 12 }, // Total
+    { wch: 12 }, // Persentase
+    { wch: 10 }, // Kategori
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Analisis Soal");
+  
+  const safeTitle = examTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  XLSX.writeFile(wb, `Analisis_Soal_${safeTitle}.xlsx`);
+}

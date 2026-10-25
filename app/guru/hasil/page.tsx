@@ -7,11 +7,11 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { isLoggedIn } from "../../lib/auth";
 import { fetchExams, fetchResultsByExam } from "../../lib/db";
-import { exportResultsToExcel } from "../../lib/excel";
+import { exportResultsToExcel, exportQuestionAnalysisToExcel } from "../../lib/excel"; // Import fungsi baru
 import { supabase } from "../../lib/supabase";
 import type { Exam, ExamResult, Question } from "../../lib/types";
 
-// Fungsi untuk mengecek jawaban (sama seperti di UjianClient)
+// Fungsi untuk mengecek jawaban
 function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
   if (jawabanSiswa === undefined || jawabanSiswa === null) return false;
   const normalize = (s: string) => String(s).trim().toLowerCase();
@@ -47,7 +47,6 @@ export default function HasilUjianPage() {
   const [isFetchingResults, setIsFetchingResults] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // State untuk Modal Analisis Jawaban Siswa
   const [selectedResult, setSelectedResult] = useState<ExamResult | null>(null);
   const [activeTab, setActiveTab] = useState<"siswa" | "soal">("siswa");
 
@@ -96,13 +95,6 @@ export default function HasilUjianPage() {
     setResults(results.filter(r => r.id !== id));
   }
 
-  function handleExport() {
-    const exam = exams.find((e) => e.id === selectedExamId);
-    if (!exam || results.length === 0) return;
-    const resultsWithTitle = results.map(r => ({ ...r, examTitle: exam.title }));
-    exportResultsToExcel(resultsWithTitle, exam.title);
-  }
-
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Memuat data...</p></div>;
   }
@@ -110,7 +102,6 @@ export default function HasilUjianPage() {
   const selectedExam = exams.find((e) => e.id === selectedExamId);
   const rataRata = results.length > 0 ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length) : 0;
 
-  // Menghitung Analisis Soal
   const questionAnalysis = selectedExam?.questions.map(q => {
     let correctCount = 0;
     results.forEach(r => {
@@ -121,19 +112,32 @@ export default function HasilUjianPage() {
     
     const percentage = results.length > 0 ? Math.round((correctCount / results.length) * 100) : 0;
     
-    // Kategorisasi Tingkat Kesukaran
     let kategori = "Sedang";
-    let badgeClass = "bg-amber-100 text-amber-700"; // Default kuning
+    let badgeClass = "bg-amber-100 text-amber-700";
     if (percentage >= 70) {
       kategori = "Mudah";
-      badgeClass = "bg-emerald-100 text-emerald-700"; // Hijau
+      badgeClass = "bg-emerald-100 text-emerald-700";
     } else if (percentage < 30) {
       kategori = "Sulit";
-      badgeClass = "bg-red-100 text-red-700"; // Merah
+      badgeClass = "bg-red-100 text-red-700";
     }
 
     return { question: q, correctCount, percentage, kategori, badgeClass };
   }) || [];
+
+  // --- FUNGSI EXPORT YANG SUDAH DINAMIS ---
+  function handleExport() {
+    if (!selectedExam) return;
+
+    if (activeTab === "siswa") {
+      if (results.length === 0) return alert("Belum ada data siswa untuk diekspor.");
+      const resultsWithTitle = results.map(r => ({ ...r, examTitle: selectedExam.title }));
+      exportResultsToExcel(resultsWithTitle, selectedExam.title);
+    } else {
+      if (questionAnalysis.length === 0) return alert("Belum ada data analisis untuk diekspor.");
+      exportQuestionAnalysisToExcel(questionAnalysis, selectedExam.title, results.length);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
@@ -171,13 +175,17 @@ export default function HasilUjianPage() {
                   {isRefreshing ? "Memuat..." : "Refresh"}
                 </button>
 
-                <button onClick={handleExport} disabled={results.length === 0 || isFetchingResults} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50">
-                  <Download className="w-4 h-4 mr-1.5" />Export Excel
+                <button 
+                  onClick={handleExport} 
+                  disabled={(activeTab === 'siswa' && results.length === 0) || (activeTab === 'soal' && questionAnalysis.length === 0) || isFetchingResults} 
+                  className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4 mr-1.5" />
+                  Export {activeTab === "siswa" ? "Nilai" : "Analisis"}
                 </button>
               </div>
             </div>
 
-            {/* Tab Navigation */}
             <div className="flex gap-2 mb-4">
               <button onClick={() => setActiveTab("siswa")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === "siswa" ? "bg-emerald-100 text-emerald-800" : "text-slate-500 hover:bg-slate-100"}`}>Daftar Nilai Siswa</button>
               <button onClick={() => setActiveTab("soal")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === "soal" ? "bg-emerald-100 text-emerald-800" : "text-slate-500 hover:bg-slate-100"}`}>Analisis Butir Soal</button>
@@ -186,7 +194,6 @@ export default function HasilUjianPage() {
             {isFetchingResults ? (
                <Card className="p-12 text-center"><p className="text-sm text-slate-500 animate-pulse">Mengambil data...</p></Card>
             ) : activeTab === "siswa" ? (
-              // TAB 1: DAFTAR NILAI SISWA
               results.length === 0 ? (
                 <Card className="p-12 text-center"><Trophy className="w-10 h-10 text-slate-300 mx-auto mb-3" /><p className="font-semibold text-slate-700 mb-1">Belum ada hasil</p><p className="text-sm text-slate-500">Siswa belum mengerjakan ujian ini.</p></Card>
               ) : (
@@ -237,7 +244,6 @@ export default function HasilUjianPage() {
                 </>
               )
             ) : (
-              // TAB 2: ANALISIS BUTIR SOAL
               <div className="space-y-3">
                 {questionAnalysis.map((qa, i) => (
                   <Card key={i} className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -247,7 +253,6 @@ export default function HasilUjianPage() {
                       <div className="flex items-center gap-2 mt-1">
                         <p className="text-xs text-slate-500">Tipe: {qa.question.type.replace("_", " ").toUpperCase()}</p>
                         <span className="text-slate-300">•</span>
-                        {/* Badge Kategori Kesukaran */}
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${qa.badgeClass}`}>
                           {qa.kategori}
                         </span>
