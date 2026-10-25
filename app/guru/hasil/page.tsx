@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Trophy, FileText, AlertTriangle, Trash2, Eye, X } from "lucide-react";
+import { ArrowLeft, Download, Trophy, FileText, AlertTriangle, Trash2, Eye, X, RefreshCw } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { isLoggedIn } from "../../lib/auth";
@@ -45,6 +45,7 @@ export default function HasilUjianPage() {
   const [selectedExamId, setSelectedExamId] = useState<string>("");
   const [results, setResults] = useState<ExamResult[]>([]);
   const [isFetchingResults, setIsFetchingResults] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false); // State untuk tombol refresh
   
   // State untuk Modal Analisis Jawaban Siswa
   const [selectedResult, setSelectedResult] = useState<ExamResult | null>(null);
@@ -74,6 +75,13 @@ export default function HasilUjianPage() {
     const data = await fetchResultsByExam(id);
     setResults(data);
     setIsFetchingResults(false);
+  }
+
+  async function handleRefresh() {
+    setIsRefreshing(true);
+    const data = await fetchResultsByExam(selectedExamId);
+    setResults(data);
+    setIsRefreshing(false);
   }
 
   async function handleDeleteResult(id: string, name: string) {
@@ -137,7 +145,19 @@ export default function HasilUjianPage() {
                   {exams.map((e) => <option key={e.id} value={e.id}>{e.title}</option>)}
                 </select>
               </div>
-              <div className="sm:pt-6">
+              <div className="sm:pt-6 flex items-center gap-2">
+                
+                {/* TOMBOL REFRESH */}
+                <button 
+                  onClick={handleRefresh} 
+                  disabled={isRefreshing} 
+                  className="inline-flex items-center justify-center font-semibold rounded-xl px-4 py-2.5 text-sm bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-50 transition"
+                  title="Tarik data terbaru dari server"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? "Memuat..." : "Refresh"}
+                </button>
+
                 <button onClick={handleExport} disabled={results.length === 0 || isFetchingResults} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50">
                   <Download className="w-4 h-4 mr-1.5" />Export Excel
                 </button>

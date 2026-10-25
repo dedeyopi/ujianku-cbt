@@ -119,8 +119,17 @@ export async function removeExam(id: string): Promise<boolean> {
 }
 
 // --- FUNGSI SIMPAN HASIL UJIAN ---
+
 export async function submitResult(result: ExamResult): Promise<boolean> {
-  const { error } = await supabase.from("results").upsert({
+  // 1. Hapus hasil lama jika siswa ini sudah pernah mengerjakan (untuk jaga-jaga ulangan)
+  await supabase
+    .from("results")
+    .delete()
+    .eq("exam_id", result.examId)
+    .eq("student_id", result.studentId);
+
+  // 2. Masukkan data hasil baru
+  const { error } = await supabase.from("results").insert({
     id: result.id,
     exam_id: result.examId,
     student_id: result.studentId,
