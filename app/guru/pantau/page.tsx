@@ -13,10 +13,11 @@ export default function PantauUjianPage() {
   const router = useRouter();
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0); // Inisialisasi 0 agar aman saat SSR
 
   // Update waktu setiap detik untuk menghitung "terakhir terlihat"
   useEffect(() => {
+    setNow(Date.now()); // Set waktu pertama kali di client
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -62,6 +63,7 @@ export default function PantauUjianPage() {
 
   // Hitung status online berdasarkan last_seen (jika > 30 detik, anggap offline)
   const getStatus = (lastSeen: string) => {
+    if (now === 0) return { label: "Memuat", color: "text-slate-500 bg-slate-100", dot: "bg-slate-400" };
     const diff = now - new Date(lastSeen).getTime();
     if (diff < 30000) return { label: "Online", color: "text-emerald-600 bg-emerald-50", dot: "bg-emerald-500" };
     return { label: "Terputus", color: "text-slate-500 bg-slate-100", dot: "bg-slate-400" };
