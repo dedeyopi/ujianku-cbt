@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, Trophy, FileText, AlertTriangle, Trash2, Eye, X, RefreshCw, Save } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { isLoggedIn } from "../../lib/auth";
-import { fetchExams, fetchResultsByExam, updateResultGrades } from "../../lib/db"; // Import fungsi baru
+import { fetchExams, fetchResultsByExam, updateResultGrades } from "../../lib/db";
 import { exportResultsToExcel, exportQuestionAnalysisToExcel } from "../../lib/excel";
 import { supabase } from "../../lib/supabase";
 import type { Exam, ExamResult, Question } from "../../lib/types";
@@ -47,12 +47,16 @@ export default function HasilUjianPage() {
   const [isFetchingResults, setIsFetchingResults] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
+  // State untuk Modal Analisis Jawaban Siswa
   const [selectedResult, setSelectedResult] = useState<ExamResult | null>(null);
   const [activeTab, setActiveTab] = useState<"siswa" | "soal">("siswa");
   
   // State untuk penilaian esai manual
   const [essayScores, setEssayScores] = useState<Record<string, number>>({});
   const [isSavingGrades, setIsSavingGrades] = useState(false);
+
+  // State untuk filter kelas
+  const [filterClass, setFilterClass] = useState("Semua");
 
   useEffect(() => {
     async function init() {
@@ -82,6 +86,7 @@ export default function HasilUjianPage() {
   async function handleSelectExam(id: string) {
     setSelectedExamId(id);
     setIsFetchingResults(true);
+    setFilterClass("Semua"); // Reset filter saat ganti ujian
     const data = await fetchResultsByExam(id);
     setResults(data);
     setIsFetchingResults(false);
@@ -101,24 +106,35 @@ export default function HasilUjianPage() {
     setResults(results.filter(r => r.id !== id));
   }
 
+  // --- LOGIKA FILTER KELAS ---
+  const availableClasses = useMemo(() => {
+    const classes = new Set(results.map(r => r.className).filter(Boolean));
+    return ["Semua", ...Array.from(classes).sort()];
+  }, [results]);
+
+  const filteredResults = results.filter(r => 
+    filterClass === "Semua" ? true : r.className === filterClass
+  );
+
+  // --- FUNGSI EXPORT DINAMIS ---
   function handleExport() {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam) return;
+    
     if (activeTab === "siswa") {
-      if (results.length === 0) return alert("Belum ada data.");
-      exportResultsToExcel(results.map(r => ({ ...r, examTitle: exam.title })), exam.title);
+      if (filteredResults.length === 0) return alert("Belum ada data untuk diekspor.");
+      exportResultsToExcel(filteredResults.map(r => ({ ...r, examTitle: exam.title })), exam.title);
     } else {
       const qAnalysis = getQuestionAnalysis();
-      if (qAnalysis.length === 0) return alert("Belum ada data.");
-      exportQuestionAnalysisToExcel(qAnalysis, exam.title, results.length);
+      if (qAnalysis.length === 0) return alert("Belum ada data analisis.");
+      exportQuestionAnalysisToExcel(qAnalysis, exam.title, filteredResults.length);
     }
   }
 
-  // Fungsi menyimpan nilai esai
+  // --- FUNGSI SIMPAN NILAI ESAI ---
   async function handleSaveEssayGrades() {
     if (!selectedResult || !selectedExam) return;
     
-    // Hitung total benar otomatis
     let correctAuto = 0;
     selectedExam.questions.forEach(q => {
       if (q.type !== "essay" && selectedResult.answers && isJawabanBenar(q, selectedResult.answers[q.id])) {
@@ -126,13 +142,11 @@ export default function HasilUjianPage() {
       }
     });
 
-    // Hitung kontribusi nilai esai (misal nilai 80 = 0.8 poin jika 1 soal bernilai 1)
     let essayContribution = 0;
     Object.values(essayScores).forEach(score => {
-      essayContribution += (score / 100); // Ubah 0-100 menjadi 0-1
+      essayContribution += (score / 100);
     });
 
-    // Hitung nilai akhir (Skala 100)
     const totalPoinDidapat = correctAuto + essayContribution;
     const totalSoal = selectedExam.questions.length;
     const nilaiBaru = Math.round((totalPoinDidapat / totalSoal) * 100);
@@ -142,23 +156,25 @@ export default function HasilUjianPage() {
     
     if (success) {
       alert("Nilai esai berhasil disimpan!");
-      setSelectedResult(null); // Tutup modal
-      handleRefresh(); // Perbarui tabel
+      setSelectedResult(null);
+      handleRefresh();
     } else {
       alert("Gagal menyimpan nilai. Coba lagi.");
     }
     setIsSavingGrades(false);
   }
 
+  // --- FUNGSI ANALISIS BUTIR SOAL ---
   const getQuestionAnalysis = () => {
     const selectedExam = exams.find((e) => e.id === selectedExamId);
     if (!selectedExam) return [];
     return selectedExam.questions.map(q => {
       let correctCount = 0;
-      results.forEach(r => {
+      // Gunakan filteredResults agar analisis mengikuti filter kelas
+      filteredResults.forEach(r => {
         if (r.answers && isJawabanBenar(q, r.answers[q.id])) correctCount++;
       });
-      const percentage = results.length > 0 ? Math.round((correctCount / results.length) * 100) : 0;
+      const percentage = filteredResults.length > 0 ? Math.round((correctCount / filteredResults.length) * 100) : 0;
       
       let kategori = "Sedang"; let badgeClass = "bg-amber-100 text-amber-700";
       if (q.type === "essay") { kategori = "Manual"; badgeClass = "bg-blue-100 text-blue-700"; }
@@ -174,7 +190,7 @@ export default function HasilUjianPage() {
   }
 
   const selectedExam = exams.find((e) => e.id === selectedExamId);
-  const rataRata = results.length > 0 ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length) : 0;
+  const rataRata = filteredResults.length > 0 ? Math.round(filteredResults.reduce((sum, r) => sum + r.score, 0) / filteredResults.length) : 0;
   const questionAnalysis = getQuestionAnalysis();
 
   return (
@@ -196,18 +212,25 @@ export default function HasilUjianPage() {
           <Card className="p-12 text-center"><FileText className="w-10 h-10 text-slate-300 mx-auto mb-3" /><p className="text-slate-500">Belum ada ujian.</p></Card>
         ) : (
           <>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <div className="flex-1">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+              <div className="flex-1 min-w-[200px]">
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Pilih Ujian</label>
                 <select value={selectedExamId} onChange={(e) => handleSelectExam(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition">
                   {exams.map((e) => <option key={e.id} value={e.id}>{e.title}</option>)}
                 </select>
               </div>
-              <div className="sm:pt-6 flex items-center gap-2">
+              
+              <div className="lg:pt-6 flex flex-wrap items-center gap-2">
+                {/* DROPDOWN FILTER KELAS */}
+                <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 font-medium">
+                  {availableClasses.map(c => <option key={c} value={c}>{c === "Semua" ? "Semua Kelas" : `Kelas ${c}`}</option>)}
+                </select>
+
                 <button onClick={handleRefresh} disabled={isRefreshing} className="inline-flex items-center justify-center font-semibold rounded-xl px-4 py-2.5 text-sm bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-50 transition">
                   <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />{isRefreshing ? "Memuat..." : "Refresh"}
                 </button>
-                <button onClick={handleExport} disabled={(activeTab === 'siswa' && results.length === 0) || (activeTab === 'soal' && questionAnalysis.length === 0) || isFetchingResults} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50">
+                
+                <button onClick={handleExport} disabled={(activeTab === 'siswa' && filteredResults.length === 0) || (activeTab === 'soal' && questionAnalysis.length === 0) || isFetchingResults} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50">
                   <Download className="w-4 h-4 mr-1.5" />Export {activeTab === "siswa" ? "Nilai" : "Analisis"}
                 </button>
               </div>
@@ -221,14 +244,14 @@ export default function HasilUjianPage() {
             {isFetchingResults ? (
                <Card className="p-12 text-center"><p className="text-sm text-slate-500 animate-pulse">Mengambil data...</p></Card>
             ) : activeTab === "siswa" ? (
-              results.length === 0 ? (
-                <Card className="p-12 text-center"><Trophy className="w-10 h-10 text-slate-300 mx-auto mb-3" /><p className="font-semibold text-slate-700 mb-1">Belum ada hasil</p><p className="text-sm text-slate-500">Siswa belum mengerjakan ujian ini.</p></Card>
+              filteredResults.length === 0 ? (
+                <Card className="p-12 text-center"><Trophy className="w-10 h-10 text-slate-300 mx-auto mb-3" /><p className="font-semibold text-slate-700 mb-1">Belum ada hasil</p><p className="text-sm text-slate-500">Tidak ada siswa yang cocok dengan filter ini.</p></Card>
               ) : (
                 <>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-                    <Card className="p-4"><p className="text-xs text-slate-500 mb-1">Total Peserta</p><p className="text-2xl font-bold text-slate-900">{results.length}</p></Card>
+                    <Card className="p-4"><p className="text-xs text-slate-500 mb-1">Total Peserta</p><p className="text-2xl font-bold text-slate-900">{filteredResults.length}</p></Card>
                     <Card className="p-4"><p className="text-xs text-slate-500 mb-1">Rata-rata Nilai</p><p className="text-2xl font-bold text-emerald-600">{rataRata}</p></Card>
-                    <Card className="p-4"><p className="text-xs text-slate-500 mb-1">Total Pelanggaran</p><p className="text-2xl font-bold text-amber-600">{results.reduce((sum, r) => sum + r.violations, 0)}x</p></Card>
+                    <Card className="p-4"><p className="text-xs text-slate-500 mb-1">Total Pelanggaran</p><p className="text-2xl font-bold text-amber-600">{filteredResults.reduce((sum, r) => sum + r.violations, 0)}x</p></Card>
                   </div>
 
                   <Card className="overflow-hidden">
@@ -245,7 +268,7 @@ export default function HasilUjianPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {results.map((r) => (
+                          {filteredResults.map((r) => (
                             <tr key={r.id} className="hover:bg-slate-50/50 transition">
                               <td className="px-4 py-3 font-medium text-slate-900">{r.studentName}</td>
                               <td className="px-4 py-3 text-slate-600">{r.className}</td>
@@ -286,7 +309,7 @@ export default function HasilUjianPage() {
                     <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl">
                       <div className="text-center">
                         <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Benar</p>
-                        <p className="font-bold text-slate-900">{qa.correctCount} <span className="text-xs text-slate-400 font-normal">/ {results.length}</span></p>
+                        <p className="font-bold text-slate-900">{qa.correctCount} <span className="text-xs text-slate-400 font-normal">/ {filteredResults.length}</span></p>
                       </div>
                       <div className="w-px h-8 bg-slate-200"></div>
                       <div className="text-center">
@@ -328,7 +351,6 @@ export default function HasilUjianPage() {
                     </div>
                     
                     <div className="ml-9 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      {/* KOTAK JAWABAN SISWA */}
                       <div className={`p-3 rounded-lg border ${isEssay ? 'bg-blue-50 border-blue-100 col-span-full' : isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
                         <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Jawaban Siswa</p>
                         <div className="text-slate-800 prose prose-sm max-w-none">
@@ -342,7 +364,6 @@ export default function HasilUjianPage() {
                         </div>
                       </div>
                       
-                      {/* KOTAK KUNCI JAWABAN ATAU INPUT NILAI ESAI */}
                       {!isEssay && (
                         <div className="p-3 rounded-lg border bg-slate-50 border-slate-200">
                           <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Kunci Jawaban</p>
@@ -359,7 +380,6 @@ export default function HasilUjianPage() {
                       )}
                     </div>
 
-                    {/* INPUT NILAI KHUSUS ESAI */}
                     {isEssay && (
                       <div className="ml-9 mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
                         <div>
@@ -367,18 +387,10 @@ export default function HasilUjianPage() {
                           <p className="text-xs text-blue-700">Nilai akan ditambahkan ke total skor otomatis.</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <input 
-                            type="number" 
-                            min={0} 
-                            max={100} 
-                            value={essayScores[q.id] ?? ""} 
-                            onChange={(e) => {
+                          <input type="number" min={0} max={100} value={essayScores[q.id] ?? ""} onChange={(e) => {
                               const val = parseInt(e.target.value);
                               setEssayScores(prev => ({ ...prev, [q.id]: isNaN(val) ? 0 : val }));
-                            }}
-                            className="w-24 px-3 py-2 text-lg font-bold text-center border-2 border-blue-300 rounded-xl focus:outline-none focus:border-blue-500"
-                            placeholder="0"
-                          />
+                            }} className="w-24 px-3 py-2 text-lg font-bold text-center border-2 border-blue-300 rounded-xl focus:outline-none focus:border-blue-500" placeholder="0" />
                         </div>
                       </div>
                     )}
