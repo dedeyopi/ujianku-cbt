@@ -159,7 +159,7 @@ export function UjianClient() {
     };
 
     sync();
-    const interval = setInterval(sync, 10000); // Ping setiap 10 detik
+    const interval = setInterval(sync, 5000); // Ping setiap 10 detik
     return () => clearInterval(interval);
   }, [exam, studentData, nama, nomorSoal, violations, showStartPrompt, selesai]);
 

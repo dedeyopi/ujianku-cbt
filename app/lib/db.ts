@@ -113,7 +113,7 @@ export async function updateResultGrades(resultId: string, newScore: number, man
 }
 // --- FUNGSI LIVE MONITOR ---
 export async function syncActiveSession(session: ActiveSession): Promise<void> {
-  await supabase.from("active_sessions").upsert({
+  const { error } = await supabase.from("active_sessions").upsert({
     id: session.id,
     exam_id: session.examId,
     student_id: session.studentId,
@@ -124,6 +124,9 @@ export async function syncActiveSession(session: ActiveSession): Promise<void> {
     violations: session.violations,
     last_seen: new Date().toISOString(),
   });
+  if (error) {
+    console.error("Gagal sinkronisasi Live Monitor:", error.message);
+  }
 }
 
 export async function removeActiveSession(sessionId: string): Promise<void> {
