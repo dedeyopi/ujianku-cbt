@@ -111,3 +111,21 @@ export async function updateResultGrades(resultId: string, newScore: number, man
   const { error } = await supabase.from("results").update({ score: newScore, manual_grades: manualGrades }).eq("id", resultId);
   return !error;
 }
+// --- FUNGSI LIVE MONITOR ---
+export async function syncActiveSession(session: ActiveSession): Promise<void> {
+  await supabase.from("active_sessions").upsert({
+    id: session.id,
+    exam_id: session.examId,
+    student_id: session.studentId,
+    student_name: session.studentName,
+    class_name: session.className,
+    current_question: session.currentQuestion,
+    total_questions: session.totalQuestions,
+    violations: session.violations,
+    last_seen: new Date().toISOString(),
+  });
+}
+
+export async function removeActiveSession(sessionId: string): Promise<void> {
+  await supabase.from("active_sessions").delete().eq("id", sessionId);
+}

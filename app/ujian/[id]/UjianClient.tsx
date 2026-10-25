@@ -7,8 +7,8 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { supabase } from "../../lib/supabase";
 import { getSession, saveSession, clearSession } from "../../lib/session";
-import { fetchExamById, submitResult } from "../../lib/db";
-import type { Exam, ExamSession, Question } from "../../lib/types";
+import { fetchExamById, submitResult, syncActiveSession, removeActiveSession } from "../../lib/db";
+import type { Exam, ExamSession, Question, ActiveSession } from "../../lib/types";
 
 function shuffleArrayWithSeed<T>(array: T[], seedString: string): T[] {
   let seed = 0;
@@ -89,40 +89,19 @@ export function UjianClient() {
   const [isResume, setIsResume] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [selesai, setSelesai] = useState(false);
+  
+  // State untuk sinkronisasi Live Monitor
+  const [studentData, setStudentData] = useState<{ id: string; className: string } | null>(null);
 
   const violationsRef = useRef(0);
   const skipAutoSaveRef = useRef(true);
-
-  // --- FITUR ANTI-CURANG (DISABLE KLIK KANAN, COPY, PASTE) ---
-  useEffect(() => {
-    // Hanya aktifkan jika ujian sudah dimulai dan belum selesai
-    if (showStartPrompt || selesai) return;
-
-    const disableContextMenu = (e: MouseEvent) => e.preventDefault();
-    const disableCopyPaste = (e: ClipboardEvent) => e.preventDefault();
-    const disableSelect = (e: Event) => e.preventDefault();
-
-    document.addEventListener("contextmenu", disableContextMenu);
-    document.addEventListener("copy", disableCopyPaste);
-    document.addEventListener("cut", disableCopyPaste);
-    document.addEventListener("paste", disableCopyPaste);
-    document.addEventListener("selectstart", disableSelect);
-
-    return () => {
-      document.removeEventListener("contextmenu", disableContextMenu);
-      document.removeEventListener("copy", disableCopyPaste);
-      document.removeEventListener("cut", disableCopyPaste);
-      document.removeEventListener("paste", disableCopyPaste);
-      document.removeEventListener("selectstart", disableSelect);
-    };
-  }, [showStartPrompt, selesai]);
 
   useEffect(() => {
     async function loadExam() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/siswa/login"); return; }
 
-      const { data: profile } = await supabase.from("users").select("full_name").eq("id", user.id).single();
+      const { data: profile } = await supabase.from("users").select("full_name, class_name").eq("id", user.id).single();
       if (!profile) { router.push("/siswa/login"); return; }
 
       const found = await fetchExamById(examId);
@@ -131,6 +110,7 @@ export function UjianClient() {
       const randomizedExam = getRandomizedExam(found, user.id);
       setExam(randomizedExam);
       setNama(profile.full_name);
+      setStudentData({ id: user.id, className: profile.class_name || "-" });
 
       const existing = getSession(examId);
       if (existing && existing.studentName === profile.full_name) {
@@ -159,6 +139,52 @@ export function UjianClient() {
     }
     loadExam();
   }, [examId, router]);
+
+  // --- SINKRONISASI KE LIVE MONITOR ---
+  useEffect(() => {
+    if (!exam || !studentData || showStartPrompt || selesai) return;
+
+    const sync = async () => {
+      await syncActiveSession({
+        id: `${exam.id}_${studentData.id}`,
+        examId: exam.id,
+        studentId: studentData.id,
+        studentName: nama,
+        className: studentData.className,
+        currentQuestion: nomorSoal + 1,
+        totalQuestions: exam.questions.length,
+        violations: violations,
+        lastSeen: new Date().toISOString(),
+      });
+    };
+
+    sync();
+    const interval = setInterval(sync, 10000); // Ping setiap 10 detik
+    return () => clearInterval(interval);
+  }, [exam, studentData, nama, nomorSoal, violations, showStartPrompt, selesai]);
+
+  // --- FITUR ANTI-CURANG (DISABLE KLIK KANAN, COPY, PASTE) ---
+  useEffect(() => {
+    if (showStartPrompt || selesai) return;
+
+    const disableContextMenu = (e: MouseEvent) => e.preventDefault();
+    const disableCopyPaste = (e: ClipboardEvent) => e.preventDefault();
+    const disableSelect = (e: Event) => e.preventDefault();
+
+    document.addEventListener("contextmenu", disableContextMenu);
+    document.addEventListener("copy", disableCopyPaste);
+    document.addEventListener("cut", disableCopyPaste);
+    document.addEventListener("paste", disableCopyPaste);
+    document.addEventListener("selectstart", disableSelect);
+
+    return () => {
+      document.removeEventListener("contextmenu", disableContextMenu);
+      document.removeEventListener("copy", disableCopyPaste);
+      document.removeEventListener("cut", disableCopyPaste);
+      document.removeEventListener("paste", disableCopyPaste);
+      document.removeEventListener("selectstart", disableSelect);
+    };
+  }, [showStartPrompt, selesai]);
 
   useEffect(() => {
     if (!exam || skipAutoSaveRef.current) { skipAutoSaveRef.current = false; return; }
@@ -205,7 +231,7 @@ export function UjianClient() {
   }
 
   async function submitExam(auto = false) {
-    if (!exam) return;
+    if (!exam || !studentData) return;
     if (!auto) {
       const belum = exam.questions.filter(q => jawaban[q.id] === undefined || (Array.isArray(jawaban[q.id]) && jawaban[q.id].length === 0) || jawaban[q.id] === "").length;
       if (belum > 0 && !confirm(`Masih ada ${belum} soal belum dijawab. Yakin kirim?`)) return;
@@ -218,10 +244,9 @@ export function UjianClient() {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: profile } = await supabase.from("users").select("class_name").eq("id", user.id).single();
       await submitResult({
         id: crypto.randomUUID(), examId: exam.id, examTitle: exam.title,
-        studentId: user.id, studentName: nama, className: profile?.class_name || "-",
+        studentId: user.id, studentName: nama, className: studentData.className,
         score: nilai, correct: benar, total: exam.questions.length, violations: violationsRef.current, submittedAt: new Date().toISOString(),
         answers: jawaban,
       });
@@ -229,6 +254,9 @@ export function UjianClient() {
         nama, examTitle: exam.title, benar, total: exam.questions.length, nilai, violations: violationsRef.current
       }));
     }
+
+    // Hapus dari Live Monitor karena sudah selesai
+    await removeActiveSession(`${exam.id}_${studentData.id}`);
 
     clearSession(examId);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -253,7 +281,7 @@ export function UjianClient() {
               <li>Jangan pindah tab.</li>
               <li>Klik kanan & Copy-Paste dinonaktifkan.</li>
               <li>Jawaban auto-save.</li>
-              <li>Urutan soal & opsi diacak secara unik untuk Anda.</li>
+              <li>Guru dapat memantau aktivitas Anda secara langsung.</li>
             </ul>
           </div>
           <Button onClick={startExam} className="w-full">Mulai Ujian</Button>
@@ -266,10 +294,7 @@ export function UjianClient() {
   const ans = jawaban[soal.id];
 
   return (
-    <div 
-      className="min-h-screen bg-slate-100 p-6"
-      style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }} // Mencegah seleksi teks
-    >
+    <div className="min-h-screen bg-slate-100 p-6" style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }}>
       <div className="max-w-3xl mx-auto">
         {showWarning && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">

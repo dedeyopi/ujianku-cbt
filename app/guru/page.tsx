@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Plus, LogOut, FileText, Clock, BookOpen, TrendingUp, Trash2, Edit3, Users, Trophy, Copy
+  Plus, LogOut, FileText, Clock, BookOpen, TrendingUp, Trash2, Edit3, Users, Trophy, Copy, MonitorPlay
 } from "lucide-react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -72,6 +72,9 @@ export default function DashboardGuruPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => router.push("/guru/pantau")}>
+              <MonitorPlay className="w-4 h-4 mr-1.5" />Pantau
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => router.push("/guru/hasil")}><Trophy className="w-4 h-4 mr-1.5" />Hasil</Button>
             <Button variant="secondary" size="sm" onClick={() => router.push("/guru/siswa")}><Users className="w-4 h-4 mr-1.5" />Siswa</Button>
             <Button variant="ghost" size="sm" onClick={handleLogout}><LogOut className="w-4 h-4 mr-1.5" />Keluar</Button>
