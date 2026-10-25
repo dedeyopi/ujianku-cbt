@@ -45,7 +45,7 @@ export default function HasilUjianPage() {
   const [selectedExamId, setSelectedExamId] = useState<string>("");
   const [results, setResults] = useState<ExamResult[]>([]);
   const [isFetchingResults, setIsFetchingResults] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false); // State untuk tombol refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // State untuk Modal Analisis Jawaban Siswa
   const [selectedResult, setSelectedResult] = useState<ExamResult | null>(null);
@@ -84,19 +84,15 @@ export default function HasilUjianPage() {
     setIsRefreshing(false);
   }
 
-    async function handleDeleteResult(id: string, name: string) {
+  async function handleDeleteResult(id: string, name: string) {
     if (!confirm(`Hapus hasil ujian ${name}? Siswa ini akan bisa mengerjakan ulang.`)) return;
     
-    // Hapus dari database Supabase
     const { error } = await supabase.from("results").delete().eq("id", id);
     
     if (error) {
-      alert(`Gagal menghapus data dari server: ${error.message}`);
-      console.error(error);
+      alert(`Gagal menghapus data: ${error.message}`);
       return;
     }
-
-    // Jika berhasil, perbarui tampilan
     setResults(results.filter(r => r.id !== id));
   }
 
@@ -114,7 +110,7 @@ export default function HasilUjianPage() {
   const selectedExam = exams.find((e) => e.id === selectedExamId);
   const rataRata = results.length > 0 ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length) : 0;
 
-  // Menghitung Analisis Soal (Berapa yang benar per soal)
+  // Menghitung Analisis Soal
   const questionAnalysis = selectedExam?.questions.map(q => {
     let correctCount = 0;
     results.forEach(r => {
@@ -122,11 +118,21 @@ export default function HasilUjianPage() {
         correctCount++;
       }
     });
-    return {
-      question: q,
-      correctCount,
-      percentage: results.length > 0 ? Math.round((correctCount / results.length) * 100) : 0
-    };
+    
+    const percentage = results.length > 0 ? Math.round((correctCount / results.length) * 100) : 0;
+    
+    // Kategorisasi Tingkat Kesukaran
+    let kategori = "Sedang";
+    let badgeClass = "bg-amber-100 text-amber-700"; // Default kuning
+    if (percentage >= 70) {
+      kategori = "Mudah";
+      badgeClass = "bg-emerald-100 text-emerald-700"; // Hijau
+    } else if (percentage < 30) {
+      kategori = "Sulit";
+      badgeClass = "bg-red-100 text-red-700"; // Merah
+    }
+
+    return { question: q, correctCount, percentage, kategori, badgeClass };
   }) || [];
 
   return (
@@ -156,13 +162,10 @@ export default function HasilUjianPage() {
                 </select>
               </div>
               <div className="sm:pt-6 flex items-center gap-2">
-                
-                {/* TOMBOL REFRESH */}
                 <button 
                   onClick={handleRefresh} 
                   disabled={isRefreshing} 
                   className="inline-flex items-center justify-center font-semibold rounded-xl px-4 py-2.5 text-sm bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-50 transition"
-                  title="Tarik data terbaru dari server"
                 >
                   <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                   {isRefreshing ? "Memuat..." : "Refresh"}
@@ -241,7 +244,14 @@ export default function HasilUjianPage() {
                     <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-bold flex items-center justify-center shrink-0">{i + 1}</div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-slate-900 mb-1 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: qa.question.question }} />
-                      <p className="text-xs text-slate-500">Tipe: {qa.question.type.replace("_", " ").toUpperCase()}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xs text-slate-500">Tipe: {qa.question.type.replace("_", " ").toUpperCase()}</p>
+                        <span className="text-slate-300">•</span>
+                        {/* Badge Kategori Kesukaran */}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${qa.badgeClass}`}>
+                          {qa.kategori}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl">
                       <div className="text-center">
@@ -251,7 +261,7 @@ export default function HasilUjianPage() {
                       <div className="w-px h-8 bg-slate-200"></div>
                       <div className="text-center">
                         <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Persentase</p>
-                        <p className={`font-bold ${qa.percentage >= 70 ? 'text-emerald-600' : qa.percentage >= 40 ? 'text-amber-600' : 'text-red-600'}`}>{qa.percentage}%</p>
+                        <p className={`font-bold ${qa.percentage >= 70 ? 'text-emerald-600' : qa.percentage >= 30 ? 'text-amber-600' : 'text-red-600'}`}>{qa.percentage}%</p>
                       </div>
                     </div>
                   </Card>
@@ -286,7 +296,6 @@ export default function HasilUjianPage() {
                     </div>
                     
                     <div className="ml-9 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      {/* KOTAK JAWABAN SISWA */}
                       <div className={`p-3 rounded-lg border ${isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
                         <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Jawaban Siswa</p>
                         <div className="text-slate-800 prose prose-sm max-w-none">
@@ -300,7 +309,6 @@ export default function HasilUjianPage() {
                         </div>
                       </div>
                       
-                      {/* KOTAK KUNCI JAWABAN */}
                       <div className="p-3 rounded-lg border bg-slate-50 border-slate-200">
                         <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Kunci Jawaban</p>
                         <div className="text-slate-800 prose prose-sm max-w-none">
