@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2, Users, X, Save, AlertCircle, Upload, FileSpreadsheet, Filter } from "lucide-react";
 import { Button } from "../../components/Button";
@@ -22,7 +22,9 @@ export default function KelolaSiswaPage() {
   const [form, setForm] = useState({ username: "", password: "", fullName: "", className: "" });
   const [error, setError] = useState("");
   const [filterClass, setFilterClass] = useState("Semua");
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
+  // Perbaikan: Gunakan useRef, bukan React.useRef
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function fetchStudents() {
     const { data, error } = await supabase.from("users").select("*").eq("role", "student").order("full_name");
