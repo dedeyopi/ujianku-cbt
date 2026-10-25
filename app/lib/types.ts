@@ -81,4 +81,5 @@ export type ExamResult = {
   violations: number;
   submittedAt: string;
   answers?: Record<string, any>;
+  manualGrades?: Record<string, number>;
 };

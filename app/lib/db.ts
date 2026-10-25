@@ -181,5 +181,22 @@ export async function fetchResultsByExam(examId: string): Promise<ExamResult[]> 
     violations: r.violations,
     submittedAt: r.submitted_at,
     answers: r.answers,
+    manualGrades: r.manual_grades,
   }));
+}
+
+export async function updateResultGrades(resultId: string, newScore: number, manualGrades: Record<string, number>): Promise<boolean> {
+  const { error } = await supabase
+    .from("results")
+    .update({ 
+      score: newScore,
+      manual_grades: manualGrades
+    })
+    .eq("id", resultId);
+  
+  if (error) {
+    console.error("Gagal update nilai:", error);
+    return false;
+  }
+  return true;
 }

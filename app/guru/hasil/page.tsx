@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Trophy, FileText, AlertTriangle, Trash2, Eye, X, RefreshCw } from "lucide-react";
+import { ArrowLeft, Download, Trophy, FileText, AlertTriangle, Trash2, Eye, X, RefreshCw, Save } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { isLoggedIn } from "../../lib/auth";
-import { fetchExams, fetchResultsByExam } from "../../lib/db";
-import { exportResultsToExcel, exportQuestionAnalysisToExcel } from "../../lib/excel"; // Import fungsi baru
+import { fetchExams, fetchResultsByExam, updateResultGrades } from "../../lib/db"; // Import fungsi baru
+import { exportResultsToExcel, exportQuestionAnalysisToExcel } from "../../lib/excel";
 import { supabase } from "../../lib/supabase";
 import type { Exam, ExamResult, Question } from "../../lib/types";
 
-// Fungsi untuk mengecek jawaban
+// Fungsi untuk mengecek jawaban otomatis
 function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
   if (jawabanSiswa === undefined || jawabanSiswa === null) return false;
   const normalize = (s: string) => String(s).trim().toLowerCase();
@@ -49,6 +49,10 @@ export default function HasilUjianPage() {
   
   const [selectedResult, setSelectedResult] = useState<ExamResult | null>(null);
   const [activeTab, setActiveTab] = useState<"siswa" | "soal">("siswa");
+  
+  // State untuk penilaian esai manual
+  const [essayScores, setEssayScores] = useState<Record<string, number>>({});
+  const [isSavingGrades, setIsSavingGrades] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -68,6 +72,13 @@ export default function HasilUjianPage() {
     init();
   }, [router]);
 
+  // Saat modal dibuka, isi nilai esai yang sudah ada (jika pernah dinilai)
+  useEffect(() => {
+    if (selectedResult) {
+      setEssayScores(selectedResult.manualGrades || {});
+    }
+  }, [selectedResult]);
+
   async function handleSelectExam(id: string) {
     setSelectedExamId(id);
     setIsFetchingResults(true);
@@ -85,15 +96,78 @@ export default function HasilUjianPage() {
 
   async function handleDeleteResult(id: string, name: string) {
     if (!confirm(`Hapus hasil ujian ${name}? Siswa ini akan bisa mengerjakan ulang.`)) return;
-    
     const { error } = await supabase.from("results").delete().eq("id", id);
-    
-    if (error) {
-      alert(`Gagal menghapus data: ${error.message}`);
-      return;
-    }
+    if (error) { alert(`Gagal menghapus: ${error.message}`); return; }
     setResults(results.filter(r => r.id !== id));
   }
+
+  function handleExport() {
+    const exam = exams.find((e) => e.id === selectedExamId);
+    if (!exam) return;
+    if (activeTab === "siswa") {
+      if (results.length === 0) return alert("Belum ada data.");
+      exportResultsToExcel(results.map(r => ({ ...r, examTitle: exam.title })), exam.title);
+    } else {
+      const qAnalysis = getQuestionAnalysis();
+      if (qAnalysis.length === 0) return alert("Belum ada data.");
+      exportQuestionAnalysisToExcel(qAnalysis, exam.title, results.length);
+    }
+  }
+
+  // Fungsi menyimpan nilai esai
+  async function handleSaveEssayGrades() {
+    if (!selectedResult || !selectedExam) return;
+    
+    // Hitung total benar otomatis
+    let correctAuto = 0;
+    selectedExam.questions.forEach(q => {
+      if (q.type !== "essay" && selectedResult.answers && isJawabanBenar(q, selectedResult.answers[q.id])) {
+        correctAuto++;
+      }
+    });
+
+    // Hitung kontribusi nilai esai (misal nilai 80 = 0.8 poin jika 1 soal bernilai 1)
+    let essayContribution = 0;
+    Object.values(essayScores).forEach(score => {
+      essayContribution += (score / 100); // Ubah 0-100 menjadi 0-1
+    });
+
+    // Hitung nilai akhir (Skala 100)
+    const totalPoinDidapat = correctAuto + essayContribution;
+    const totalSoal = selectedExam.questions.length;
+    const nilaiBaru = Math.round((totalPoinDidapat / totalSoal) * 100);
+
+    setIsSavingGrades(true);
+    const success = await updateResultGrades(selectedResult.id, nilaiBaru, essayScores);
+    
+    if (success) {
+      alert("Nilai esai berhasil disimpan!");
+      setSelectedResult(null); // Tutup modal
+      handleRefresh(); // Perbarui tabel
+    } else {
+      alert("Gagal menyimpan nilai. Coba lagi.");
+    }
+    setIsSavingGrades(false);
+  }
+
+  const getQuestionAnalysis = () => {
+    const selectedExam = exams.find((e) => e.id === selectedExamId);
+    if (!selectedExam) return [];
+    return selectedExam.questions.map(q => {
+      let correctCount = 0;
+      results.forEach(r => {
+        if (r.answers && isJawabanBenar(q, r.answers[q.id])) correctCount++;
+      });
+      const percentage = results.length > 0 ? Math.round((correctCount / results.length) * 100) : 0;
+      
+      let kategori = "Sedang"; let badgeClass = "bg-amber-100 text-amber-700";
+      if (q.type === "essay") { kategori = "Manual"; badgeClass = "bg-blue-100 text-blue-700"; }
+      else if (percentage >= 70) { kategori = "Mudah"; badgeClass = "bg-emerald-100 text-emerald-700"; }
+      else if (percentage < 30) { kategori = "Sulit"; badgeClass = "bg-red-100 text-red-700"; }
+
+      return { question: q, correctCount, percentage, kategori, badgeClass };
+    });
+  };
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Memuat data...</p></div>;
@@ -101,43 +175,7 @@ export default function HasilUjianPage() {
 
   const selectedExam = exams.find((e) => e.id === selectedExamId);
   const rataRata = results.length > 0 ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length) : 0;
-
-  const questionAnalysis = selectedExam?.questions.map(q => {
-    let correctCount = 0;
-    results.forEach(r => {
-      if (r.answers && isJawabanBenar(q, r.answers[q.id])) {
-        correctCount++;
-      }
-    });
-    
-    const percentage = results.length > 0 ? Math.round((correctCount / results.length) * 100) : 0;
-    
-    let kategori = "Sedang";
-    let badgeClass = "bg-amber-100 text-amber-700";
-    if (percentage >= 70) {
-      kategori = "Mudah";
-      badgeClass = "bg-emerald-100 text-emerald-700";
-    } else if (percentage < 30) {
-      kategori = "Sulit";
-      badgeClass = "bg-red-100 text-red-700";
-    }
-
-    return { question: q, correctCount, percentage, kategori, badgeClass };
-  }) || [];
-
-  // --- FUNGSI EXPORT YANG SUDAH DINAMIS ---
-  function handleExport() {
-    if (!selectedExam) return;
-
-    if (activeTab === "siswa") {
-      if (results.length === 0) return alert("Belum ada data siswa untuk diekspor.");
-      const resultsWithTitle = results.map(r => ({ ...r, examTitle: selectedExam.title }));
-      exportResultsToExcel(resultsWithTitle, selectedExam.title);
-    } else {
-      if (questionAnalysis.length === 0) return alert("Belum ada data analisis untuk diekspor.");
-      exportQuestionAnalysisToExcel(questionAnalysis, selectedExam.title, results.length);
-    }
-  }
+  const questionAnalysis = getQuestionAnalysis();
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
@@ -166,22 +204,11 @@ export default function HasilUjianPage() {
                 </select>
               </div>
               <div className="sm:pt-6 flex items-center gap-2">
-                <button 
-                  onClick={handleRefresh} 
-                  disabled={isRefreshing} 
-                  className="inline-flex items-center justify-center font-semibold rounded-xl px-4 py-2.5 text-sm bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-50 transition"
-                >
-                  <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  {isRefreshing ? "Memuat..." : "Refresh"}
+                <button onClick={handleRefresh} disabled={isRefreshing} className="inline-flex items-center justify-center font-semibold rounded-xl px-4 py-2.5 text-sm bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-50 transition">
+                  <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />{isRefreshing ? "Memuat..." : "Refresh"}
                 </button>
-
-                <button 
-                  onClick={handleExport} 
-                  disabled={(activeTab === 'siswa' && results.length === 0) || (activeTab === 'soal' && questionAnalysis.length === 0) || isFetchingResults} 
-                  className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50"
-                >
-                  <Download className="w-4 h-4 mr-1.5" />
-                  Export {activeTab === "siswa" ? "Nilai" : "Analisis"}
+                <button onClick={handleExport} disabled={(activeTab === 'siswa' && results.length === 0) || (activeTab === 'soal' && questionAnalysis.length === 0) || isFetchingResults} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50">
+                  <Download className="w-4 h-4 mr-1.5" />Export {activeTab === "siswa" ? "Nilai" : "Analisis"}
                 </button>
               </div>
             </div>
@@ -231,7 +258,7 @@ export default function HasilUjianPage() {
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <div className="flex justify-end gap-1">
-                                  <button onClick={() => setSelectedResult(r)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Lihat Jawaban"><Eye className="w-4 h-4" /></button>
+                                  <button onClick={() => setSelectedResult(r)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Lihat & Beri Nilai Esai"><Eye className="w-4 h-4" /></button>
                                   <button onClick={() => handleDeleteResult(r.id, r.studentName)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Ulang Ujian (Hapus Nilai)"><Trash2 className="w-4 h-4" /></button>
                                 </div>
                               </td>
@@ -253,9 +280,7 @@ export default function HasilUjianPage() {
                       <div className="flex items-center gap-2 mt-1">
                         <p className="text-xs text-slate-500">Tipe: {qa.question.type.replace("_", " ").toUpperCase()}</p>
                         <span className="text-slate-300">•</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${qa.badgeClass}`}>
-                          {qa.kategori}
-                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${qa.badgeClass}`}>{qa.kategori}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl">
@@ -277,14 +302,14 @@ export default function HasilUjianPage() {
         )}
       </div>
 
-      {/* MODAL ANALISIS JAWABAN SISWA */}
+      {/* MODAL ANALISIS JAWABAN SISWA & PENILAIAN ESAI */}
       {selectedResult && selectedExam && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 sm:p-6">
           <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col animate-fade-in-up">
             <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-2xl">
               <div>
                 <h3 className="font-bold text-slate-900">Lembar Jawaban: {selectedResult.studentName}</h3>
-                <p className="text-xs text-slate-500">Nilai: {selectedResult.score} • Kelas: {selectedResult.className}</p>
+                <p className="text-xs text-slate-500">Nilai Saat Ini: {selectedResult.score} • Kelas: {selectedResult.className}</p>
               </div>
               <button onClick={() => setSelectedResult(null)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500"><X className="w-5 h-5" /></button>
             </div>
@@ -292,16 +317,19 @@ export default function HasilUjianPage() {
             <div className="p-4 overflow-y-auto space-y-4 bg-slate-50/50">
               {selectedExam.questions.map((q, i) => {
                 const studentAns = selectedResult.answers ? selectedResult.answers[q.id] : undefined;
-                const isCorrect = isJawabanBenar(q, studentAns);
+                const isCorrect = q.type !== "essay" && isJawabanBenar(q, studentAns);
+                const isEssay = q.type === "essay";
+                
                 return (
                   <div key={q.id} className="p-4 bg-white border border-slate-200 rounded-xl">
                     <div className="flex gap-3 mb-3">
-                      <div className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{i + 1}</div>
+                      <div className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${isEssay ? 'bg-blue-100 text-blue-700' : isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{i + 1}</div>
                       <div className="flex-1 font-medium text-slate-900 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
                     </div>
                     
                     <div className="ml-9 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <div className={`p-3 rounded-lg border ${isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                      {/* KOTAK JAWABAN SISWA */}
+                      <div className={`p-3 rounded-lg border ${isEssay ? 'bg-blue-50 border-blue-100 col-span-full' : isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
                         <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Jawaban Siswa</p>
                         <div className="text-slate-800 prose prose-sm max-w-none">
                           {Array.isArray(studentAns) ? (
@@ -314,30 +342,57 @@ export default function HasilUjianPage() {
                         </div>
                       </div>
                       
-                      <div className="p-3 rounded-lg border bg-slate-50 border-slate-200">
-                        <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Kunci Jawaban</p>
-                        <div className="text-slate-800 prose prose-sm max-w-none">
-                          {q.type === "complex_mc" ? (
-                            q.correctAnswers?.map((a, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: a }} />)
-                          ) : q.type === "true_false" ? (
-                            q.trueFalseAnswer ? "Benar" : "Salah"
-                          ) : q.type === "short_answer" ? (
-                            q.acceptedAnswers?.map((a, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: a }} />)
-                          ) : q.type === "multi_true_false" ? (
-                            "Lihat Pernyataan"
-                          ) : q.type === "matching" ? (
-                            "Lihat Pasangan"
-                          ) : q.type === "ordering" ? (
-                            q.items?.map((item, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: item }} />)
-                          ) : (
-                            <div dangerouslySetInnerHTML={{ __html: q.correctAnswer || "-" }} />
-                          )}
+                      {/* KOTAK KUNCI JAWABAN ATAU INPUT NILAI ESAI */}
+                      {!isEssay && (
+                        <div className="p-3 rounded-lg border bg-slate-50 border-slate-200">
+                          <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Kunci Jawaban</p>
+                          <div className="text-slate-800 prose prose-sm max-w-none">
+                            {q.type === "complex_mc" ? q.correctAnswers?.map((a, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: a }} />)
+                            : q.type === "true_false" ? (q.trueFalseAnswer ? "Benar" : "Salah")
+                            : q.type === "short_answer" ? q.acceptedAnswers?.map((a, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: a }} />)
+                            : q.type === "multi_true_false" ? "Lihat Pernyataan"
+                            : q.type === "matching" ? "Lihat Pasangan"
+                            : q.type === "ordering" ? q.items?.map((item, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: item }} />)
+                            : <div dangerouslySetInnerHTML={{ __html: q.correctAnswer || "-" }} />}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* INPUT NILAI KHUSUS ESAI */}
+                    {isEssay && (
+                      <div className="ml-9 mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-blue-900">Beri Nilai Esai (0-100)</p>
+                          <p className="text-xs text-blue-700">Nilai akan ditambahkan ke total skor otomatis.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="number" 
+                            min={0} 
+                            max={100} 
+                            value={essayScores[q.id] ?? ""} 
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value);
+                              setEssayScores(prev => ({ ...prev, [q.id]: isNaN(val) ? 0 : val }));
+                            }}
+                            className="w-24 px-3 py-2 text-lg font-bold text-center border-2 border-blue-300 rounded-xl focus:outline-none focus:border-blue-500"
+                            placeholder="0"
+                          />
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
+            </div>
+            
+            <div className="p-4 border-t bg-slate-50 rounded-b-2xl flex justify-end gap-2">
+               <Button variant="secondary" onClick={() => setSelectedResult(null)}>Tutup</Button>
+               <Button onClick={handleSaveEssayGrades} disabled={isSavingGrades} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                 <Save className="w-4 h-4 mr-1.5" />
+                 {isSavingGrades ? "Menyimpan..." : "Simpan Nilai Esai"}
+               </Button>
             </div>
           </Card>
         </div>
