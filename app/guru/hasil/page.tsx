@@ -84,9 +84,19 @@ export default function HasilUjianPage() {
     setIsRefreshing(false);
   }
 
-  async function handleDeleteResult(id: string, name: string) {
+    async function handleDeleteResult(id: string, name: string) {
     if (!confirm(`Hapus hasil ujian ${name}? Siswa ini akan bisa mengerjakan ulang.`)) return;
-    await supabase.from("results").delete().eq("id", id);
+    
+    // Hapus dari database Supabase
+    const { error } = await supabase.from("results").delete().eq("id", id);
+    
+    if (error) {
+      alert(`Gagal menghapus data dari server: ${error.message}`);
+      console.error(error);
+      return;
+    }
+
+    // Jika berhasil, perbarui tampilan
     setResults(results.filter(r => r.id !== id));
   }
 
