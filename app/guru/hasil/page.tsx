@@ -255,13 +255,43 @@ export default function HasilUjianPage() {
                       <div className="flex-1 font-medium text-slate-900 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
                     </div>
                     
-                    <div className="ml-9 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                        <div className="ml-9 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      {/* KOTAK JAWABAN SISWA */}
                       <div className={`p-3 rounded-lg border ${isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
                         <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Jawaban Siswa</p>
-                        <div className="text-slate-800">
-                          {Array.isArray(studentAns) ? studentAns.join(", ") : String(studentAns || "Tidak dijawab")}
+                        <div className="text-slate-800 prose prose-sm max-w-none">
+                          {Array.isArray(studentAns) ? (
+                            <ul className="list-disc pl-4">
+                              {studentAns.length > 0 ? studentAns.map((a, idx) => <li key={idx} dangerouslySetInnerHTML={{ __html: a }} />) : "Tidak dijawab"}
+                            </ul>
+                          ) : (
+                            <div dangerouslySetInnerHTML={{ __html: String(studentAns || "Tidak dijawab") }} />
+                          )}
                         </div>
                       </div>
+                      
+                      {/* KOTAK KUNCI JAWABAN */}
+                      <div className="p-3 rounded-lg border bg-slate-50 border-slate-200">
+                        <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Kunci Jawaban</p>
+                        <div className="text-slate-800 prose prose-sm max-w-none">
+                          {q.type === "complex_mc" ? (
+                            q.correctAnswers?.map((a, i) => <div key={i} dangerouslySetInnerHTML={{ __html: a }} />)
+                          ) : q.type === "true_false" ? (
+                            q.trueFalseAnswer ? "Benar" : "Salah"
+                          ) : q.type === "short_answer" ? (
+                            q.acceptedAnswers?.map((a, i) => <div key={i} dangerouslySetInnerHTML={{ __html: a }} />)
+                          ) : q.type === "multi_true_false" ? (
+                            "Lihat Pernyataan"
+                          ) : q.type === "matching" ? (
+                            "Lihat Pasangan"
+                          ) : q.type === "ordering" ? (
+                            q.items?.map((item, i) => <div key={i} dangerouslySetInnerHTML={{ __html: item }} />)
+                          ) : (
+                            <div dangerouslySetInnerHTML={{ __html: q.correctAnswer || "-" }} />
+                          )}
+                        </div>
+                      </div>
+                    </div>
                       
                       {/* Tampilkan Kunci Jawaban */}
                       <div className="p-3 rounded-lg border bg-slate-50 border-slate-200">
