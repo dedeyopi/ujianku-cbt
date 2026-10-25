@@ -10,35 +10,48 @@ import { getSession, saveSession, clearSession } from "../../lib/session";
 import { fetchExamById, submitResult } from "../../lib/db";
 import type { Exam, ExamSession, Question } from "../../lib/types";
 
-// --- FUNGSI BANTUAN PENGACAKAN ---
-function shuffleArray<T>(array: T[]): T[] {
+// --- FUNGSI BANTUAN PENGACAKAN (SEEDED) ---
+// Fungsi ini menjamin urutan acak yang KONSISTEN berdasarkan ID Siswa
+function shuffleArrayWithSeed<T>(array: T[], seedString: string): T[] {
+  let seed = 0;
+  for (let i = 0; i < seedString.length; i++) {
+    seed += seedString.charCodeAt(i);
+  }
+  
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    seed = (seed * 9301 + 49297) % 233280;
+    const rnd = seed / 233280;
+    const j = Math.floor(rnd * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
 }
 
-function getRandomizedExam(exam: Exam): Exam {
-  const shuffledQuestions = shuffleArray(exam.questions).map(q => {
+function getRandomizedExam(exam: Exam, studentId: string): Exam {
+  // 1. Acak urutan soal berdasarkan ID Siswa
+  const shuffledQuestions = shuffleArrayWithSeed(exam.questions, studentId + exam.id).map(q => {
     const newQ = { ...q };
-    // Acak opsi jawaban untuk PG dan PG Kompleks
+    
+    // 2. Acak opsi jawaban (PG & PG Kompleks) berdasarkan ID Siswa + ID Soal
     if ((newQ.type === "multiple_choice" || newQ.type === "complex_mc") && newQ.options) {
+      const qSeed = studentId + q.id;
       if (newQ.optionImages) {
-        // Gabungkan teks dan gambar agar tetap sinkron saat diacak
+        // Gabungkan teks dan gambar agar tetap sinkron
         const zipped = newQ.options.map((opt, i) => ({ opt, img: newQ.optionImages![i] }));
-        const shuffled = shuffleArray(zipped);
+        const shuffled = shuffleArrayWithSeed(zipped, qSeed);
         newQ.options = shuffled.map(z => z.opt);
         newQ.optionImages = shuffled.map(z => z.img);
       } else {
-        newQ.options = shuffleArray(newQ.options);
+        newQ.options = shuffleArrayWithSeed(newQ.options, qSeed);
       }
     }
-    // Acak urutan pasangan untuk Menjodohkan
+    
+    // 3. Acak urutan kotak Kiri pada soal Menjodohkan
     if (newQ.type === "matching" && newQ.pairs) {
-      newQ.pairs = shuffleArray(newQ.pairs);
+      newQ.pairs = shuffleArrayWithSeed(newQ.pairs, studentId + q.id);
     }
+    
     return newQ;
   });
   return { ...exam, questions: shuffledQuestions };
@@ -104,8 +117,8 @@ export function UjianClient() {
       const found = await fetchExamById(examId);
       if (!found || !found.isActive) { router.push("/siswa"); return; }
       
-      // ACAK SOAL DAN OPSI DI SINI
-      const randomizedExam = getRandomizedExam(found);
+      // --- TERAPKAN PENGACAKAN DI SINI ---
+      const randomizedExam = getRandomizedExam(found, user.id);
       setExam(randomizedExam);
       setNama(profile.full_name);
 
@@ -118,11 +131,11 @@ export function UjianClient() {
         setSisaWaktu(Math.max(0, found.duration - elapsed));
         setIsResume(true);
       } else {
-        // Inisialisasi jawaban untuk soal "Mengurutkan" dengan urutan acak
+        // Inisialisasi jawaban acak awal untuk soal "Mengurutkan"
         const initialAnswers: Record<string, any> = {};
         randomizedExam.questions.forEach(q => {
           if (q.type === "ordering" && q.items) {
-            initialAnswers[q.id] = shuffleArray(q.items);
+            initialAnswers[q.id] = shuffleArrayWithSeed(q.items, user.id + q.id);
           }
         });
 
@@ -191,7 +204,6 @@ export function UjianClient() {
     setSelesai(true);
 
     let benar = 0;
-    // Penilaian tetap menggunakan `exam` yang sudah diacak, karena ID soal dan konten jawaban tidak berubah
     exam.questions.forEach(q => { if (isJawabanBenar(q, jawaban[q.id])) benar++; });
     const nilai = Math.round((benar / exam.questions.length) * 100);
 
