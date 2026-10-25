@@ -156,7 +156,7 @@ export function UjianClient() {
       await submitResult({
         id: crypto.randomUUID(), examId: exam.id, examTitle: exam.title,
         studentId: user.id, studentName: nama, className: profile?.class_name || "-",
-        score: nilai, correct: benar, total: exam.questions.length, violations: violationsRef.current, submittedAt: new Date().toISOString()
+        score: nilai, correct: benar, total: exam.questions.length, violations: violationsRef.current, submittedAt: new Date().toISOString(), answer: jawaban,
       });
       localStorage.setItem("hasilUjian", JSON.stringify({
         nama, examTitle: exam.title, benar, total: exam.questions.length, nilai, violations: violationsRef.current

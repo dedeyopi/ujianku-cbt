@@ -129,6 +129,7 @@ export async function submitResult(result: ExamResult): Promise<boolean> {
     total: result.total,
     violations: result.violations,
     submitted_at: result.submittedAt,
+    answers: result.answers,
   });
   
   if (error) {
@@ -170,5 +171,6 @@ export async function fetchResultsByExam(examId: string): Promise<ExamResult[]> 
     total: r.total,
     violations: r.violations,
     submittedAt: r.submitted_at,
+    answers: r.answers,
   }));
 }
