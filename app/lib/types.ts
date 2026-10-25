@@ -83,3 +83,15 @@ export type ExamResult = {
   answers?: Record<string, any>;
   manualGrades?: Record<string, number>;
 };
+
+export type ActiveSession = {
+  id: string;
+  examId: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  currentQuestion: number;
+  totalQuestions: number;
+  violations: number;
+  lastSeen: string;
+};
