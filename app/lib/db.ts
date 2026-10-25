@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Exam, Question, ExamResult } from "./types";
+import type { Exam, Question, ExamResult, ActiveSession } from "./types";
 
 // --- FUNGSI BANTU (Mapping) ---
 function mapDbQuestionToQuestion(dbQ: any): Question {
