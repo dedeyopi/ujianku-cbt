@@ -78,10 +78,6 @@ export function TextEditor({ value, onChange, placeholder }: Props) {
         onBlur={handleInput}
         className="p-3 min-h-[80px] max-h-[300px] overflow-y-auto outline-none text-sm text-slate-900"
         data-placeholder={placeholder}
-        style={{
-          // Trik CSS agar placeholder muncul saat kosong
-          empty: "true",
-        }}
       />
       
       {/* CSS untuk placeholder */}
