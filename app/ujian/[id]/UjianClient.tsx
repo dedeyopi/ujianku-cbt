@@ -10,14 +10,9 @@ import { getSession, saveSession, clearSession } from "../../lib/session";
 import { fetchExamById, submitResult } from "../../lib/db";
 import type { Exam, ExamSession, Question } from "../../lib/types";
 
-// --- FUNGSI BANTUAN PENGACAKAN (SEEDED) ---
-// Fungsi ini menjamin urutan acak yang KONSISTEN berdasarkan ID Siswa
 function shuffleArrayWithSeed<T>(array: T[], seedString: string): T[] {
   let seed = 0;
-  for (let i = 0; i < seedString.length; i++) {
-    seed += seedString.charCodeAt(i);
-  }
-  
+  for (let i = 0; i < seedString.length; i++) seed += seedString.charCodeAt(i);
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
     seed = (seed * 9301 + 49297) % 233280;
@@ -29,15 +24,11 @@ function shuffleArrayWithSeed<T>(array: T[], seedString: string): T[] {
 }
 
 function getRandomizedExam(exam: Exam, studentId: string): Exam {
-  // 1. Acak urutan soal berdasarkan ID Siswa
   const shuffledQuestions = shuffleArrayWithSeed(exam.questions, studentId + exam.id).map(q => {
     const newQ = { ...q };
-    
-    // 2. Acak opsi jawaban (PG & PG Kompleks) berdasarkan ID Siswa + ID Soal
     if ((newQ.type === "multiple_choice" || newQ.type === "complex_mc") && newQ.options) {
       const qSeed = studentId + q.id;
       if (newQ.optionImages) {
-        // Gabungkan teks dan gambar agar tetap sinkron
         const zipped = newQ.options.map((opt, i) => ({ opt, img: newQ.optionImages![i] }));
         const shuffled = shuffleArrayWithSeed(zipped, qSeed);
         newQ.options = shuffled.map(z => z.opt);
@@ -46,18 +37,14 @@ function getRandomizedExam(exam: Exam, studentId: string): Exam {
         newQ.options = shuffleArrayWithSeed(newQ.options, qSeed);
       }
     }
-    
-    // 3. Acak urutan kotak Kiri pada soal Menjodohkan
     if (newQ.type === "matching" && newQ.pairs) {
       newQ.pairs = shuffleArrayWithSeed(newQ.pairs, studentId + q.id);
     }
-    
     return newQ;
   });
   return { ...exam, questions: shuffledQuestions };
 }
 
-// --- FUNGSI PENILAIAN ---
 function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
   if (jawabanSiswa === undefined || jawabanSiswa === null) return false;
   const normalize = (s: string) => String(s).trim().toLowerCase();
@@ -106,6 +93,30 @@ export function UjianClient() {
   const violationsRef = useRef(0);
   const skipAutoSaveRef = useRef(true);
 
+  // --- FITUR ANTI-CURANG (DISABLE KLIK KANAN, COPY, PASTE) ---
+  useEffect(() => {
+    // Hanya aktifkan jika ujian sudah dimulai dan belum selesai
+    if (showStartPrompt || selesai) return;
+
+    const disableContextMenu = (e: MouseEvent) => e.preventDefault();
+    const disableCopyPaste = (e: ClipboardEvent) => e.preventDefault();
+    const disableSelect = (e: Event) => e.preventDefault();
+
+    document.addEventListener("contextmenu", disableContextMenu);
+    document.addEventListener("copy", disableCopyPaste);
+    document.addEventListener("cut", disableCopyPaste);
+    document.addEventListener("paste", disableCopyPaste);
+    document.addEventListener("selectstart", disableSelect);
+
+    return () => {
+      document.removeEventListener("contextmenu", disableContextMenu);
+      document.removeEventListener("copy", disableCopyPaste);
+      document.removeEventListener("cut", disableCopyPaste);
+      document.removeEventListener("paste", disableCopyPaste);
+      document.removeEventListener("selectstart", disableSelect);
+    };
+  }, [showStartPrompt, selesai]);
+
   useEffect(() => {
     async function loadExam() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -117,7 +128,6 @@ export function UjianClient() {
       const found = await fetchExamById(examId);
       if (!found || !found.isActive) { router.push("/siswa"); return; }
       
-      // --- TERAPKAN PENGACAKAN DI SINI ---
       const randomizedExam = getRandomizedExam(found, user.id);
       setExam(randomizedExam);
       setNama(profile.full_name);
@@ -131,7 +141,6 @@ export function UjianClient() {
         setSisaWaktu(Math.max(0, found.duration - elapsed));
         setIsResume(true);
       } else {
-        // Inisialisasi jawaban acak awal untuk soal "Mengurutkan"
         const initialAnswers: Record<string, any> = {};
         randomizedExam.questions.forEach(q => {
           if (q.type === "ordering" && q.items) {
@@ -242,6 +251,7 @@ export function UjianClient() {
             <ul className="list-disc pl-4 space-y-1">
               <li>Layar penuh wajib.</li>
               <li>Jangan pindah tab.</li>
+              <li>Klik kanan & Copy-Paste dinonaktifkan.</li>
               <li>Jawaban auto-save.</li>
               <li>Urutan soal & opsi diacak secara unik untuk Anda.</li>
             </ul>
@@ -256,7 +266,10 @@ export function UjianClient() {
   const ans = jawaban[soal.id];
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6">
+    <div 
+      className="min-h-screen bg-slate-100 p-6"
+      style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }} // Mencegah seleksi teks
+    >
       <div className="max-w-3xl mx-auto">
         {showWarning && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">

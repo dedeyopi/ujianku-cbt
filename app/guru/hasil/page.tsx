@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Trophy, FileText, AlertTriangle, Trash2, Eye, X, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, Download, Trophy, FileText, AlertTriangle, Trash2, Eye, X, RefreshCw, Save, BarChart2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { isLoggedIn } from "../../lib/auth";
@@ -11,7 +11,9 @@ import { exportResultsToExcel, exportQuestionAnalysisToExcel } from "../../lib/e
 import { supabase } from "../../lib/supabase";
 import type { Exam, ExamResult, Question } from "../../lib/types";
 
-// Fungsi untuk mengecek jawaban otomatis
+// Import Komponen Recharts
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+
 function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
   if (jawabanSiswa === undefined || jawabanSiswa === null) return false;
   const normalize = (s: string) => String(s).trim().toLowerCase();
@@ -47,15 +49,11 @@ export default function HasilUjianPage() {
   const [isFetchingResults, setIsFetchingResults] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // State untuk Modal Analisis Jawaban Siswa
   const [selectedResult, setSelectedResult] = useState<ExamResult | null>(null);
-  const [activeTab, setActiveTab] = useState<"siswa" | "soal">("siswa");
+  const [activeTab, setActiveTab] = useState<"siswa" | "soal" | "grafik">("siswa");
   
-  // State untuk penilaian esai manual
   const [essayScores, setEssayScores] = useState<Record<string, number>>({});
   const [isSavingGrades, setIsSavingGrades] = useState(false);
-
-  // State untuk filter kelas
   const [filterClass, setFilterClass] = useState("Semua");
 
   useEffect(() => {
@@ -76,7 +74,6 @@ export default function HasilUjianPage() {
     init();
   }, [router]);
 
-  // Saat modal dibuka, isi nilai esai yang sudah ada (jika pernah dinilai)
   useEffect(() => {
     if (selectedResult) {
       setEssayScores(selectedResult.manualGrades || {});
@@ -86,7 +83,7 @@ export default function HasilUjianPage() {
   async function handleSelectExam(id: string) {
     setSelectedExamId(id);
     setIsFetchingResults(true);
-    setFilterClass("Semua"); // Reset filter saat ganti ujian
+    setFilterClass("Semua");
     const data = await fetchResultsByExam(id);
     setResults(data);
     setIsFetchingResults(false);
@@ -106,7 +103,6 @@ export default function HasilUjianPage() {
     setResults(results.filter(r => r.id !== id));
   }
 
-  // --- LOGIKA FILTER KELAS ---
   const availableClasses = useMemo(() => {
     const classes = new Set(results.map(r => r.className).filter(Boolean));
     return ["Semua", ...Array.from(classes).sort()];
@@ -116,7 +112,6 @@ export default function HasilUjianPage() {
     filterClass === "Semua" ? true : r.className === filterClass
   );
 
-  // --- FUNGSI EXPORT DINAMIS ---
   function handleExport() {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam) return;
@@ -131,7 +126,6 @@ export default function HasilUjianPage() {
     }
   }
 
-  // --- FUNGSI SIMPAN NILAI ESAI ---
   async function handleSaveEssayGrades() {
     if (!selectedResult || !selectedExam) return;
     
@@ -164,13 +158,11 @@ export default function HasilUjianPage() {
     setIsSavingGrades(false);
   }
 
-  // --- FUNGSI ANALISIS BUTIR SOAL ---
   const getQuestionAnalysis = () => {
     const selectedExam = exams.find((e) => e.id === selectedExamId);
     if (!selectedExam) return [];
     return selectedExam.questions.map(q => {
       let correctCount = 0;
-      // Gunakan filteredResults agar analisis mengikuti filter kelas
       filteredResults.forEach(r => {
         if (r.answers && isJawabanBenar(q, r.answers[q.id])) correctCount++;
       });
@@ -192,6 +184,37 @@ export default function HasilUjianPage() {
   const selectedExam = exams.find((e) => e.id === selectedExamId);
   const rataRata = filteredResults.length > 0 ? Math.round(filteredResults.reduce((sum, r) => sum + r.score, 0) / filteredResults.length) : 0;
   const questionAnalysis = getQuestionAnalysis();
+
+  // --- PERSIAPAN DATA UNTUK GRAFIK ---
+  // 1. Data Distribusi Nilai
+  const scoreRanges = [
+    { name: "0-59", count: 0 },
+    { name: "60-69", count: 0 },
+    { name: "70-79", count: 0 },
+    { name: "80-89", count: 0 },
+    { name: "90-100", count: 0 },
+  ];
+  filteredResults.forEach(r => {
+    if (r.score < 60) scoreRanges[0].count++;
+    else if (r.score < 70) scoreRanges[1].count++;
+    else if (r.score < 80) scoreRanges[2].count++;
+    else if (r.score < 90) scoreRanges[3].count++;
+    else scoreRanges[4].count++;
+  });
+
+  // 2. Data Tingkat Kesukaran
+  let mudah = 0, sedang = 0, sulit = 0, manual = 0;
+  questionAnalysis.forEach(qa => {
+    if (qa.kategori === "Mudah") mudah++;
+    else if (qa.kategori === "Sedang") sedang++;
+    else if (qa.kategori === "Sulit") sulit++;
+    else manual++;
+  });
+  const difficultyData = [
+    { name: "Mudah", value: mudah, color: "#10b981" }, // Emerald
+    { name: "Sedang", value: sedang, color: "#f59e0b" }, // Amber
+    { name: "Sulit", value: sulit, color: "#ef4444" }, // Red
+  ].filter(d => d.value > 0); // Hanya tampilkan yang ada datanya
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
@@ -221,7 +244,6 @@ export default function HasilUjianPage() {
               </div>
               
               <div className="lg:pt-6 flex flex-wrap items-center gap-2">
-                {/* DROPDOWN FILTER KELAS */}
                 <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 font-medium">
                   {availableClasses.map(c => <option key={c} value={c}>{c === "Semua" ? "Semua Kelas" : `Kelas ${c}`}</option>)}
                 </select>
@@ -230,15 +252,18 @@ export default function HasilUjianPage() {
                   <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />{isRefreshing ? "Memuat..." : "Refresh"}
                 </button>
                 
-                <button onClick={handleExport} disabled={(activeTab === 'siswa' && filteredResults.length === 0) || (activeTab === 'soal' && questionAnalysis.length === 0) || isFetchingResults} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50">
-                  <Download className="w-4 h-4 mr-1.5" />Export {activeTab === "siswa" ? "Nilai" : "Analisis"}
-                </button>
+                {activeTab !== "grafik" && (
+                  <button onClick={handleExport} disabled={(activeTab === 'siswa' && filteredResults.length === 0) || (activeTab === 'soal' && questionAnalysis.length === 0) || isFetchingResults} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50">
+                    <Download className="w-4 h-4 mr-1.5" />Export {activeTab === "siswa" ? "Nilai" : "Analisis"}
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="flex gap-2 mb-4">
-              <button onClick={() => setActiveTab("siswa")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === "siswa" ? "bg-emerald-100 text-emerald-800" : "text-slate-500 hover:bg-slate-100"}`}>Daftar Nilai Siswa</button>
-              <button onClick={() => setActiveTab("soal")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === "soal" ? "bg-emerald-100 text-emerald-800" : "text-slate-500 hover:bg-slate-100"}`}>Analisis Butir Soal</button>
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+              <button onClick={() => setActiveTab("siswa")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition whitespace-nowrap ${activeTab === "siswa" ? "bg-emerald-100 text-emerald-800" : "text-slate-500 hover:bg-slate-100"}`}>Daftar Nilai Siswa</button>
+              <button onClick={() => setActiveTab("soal")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition whitespace-nowrap ${activeTab === "soal" ? "bg-emerald-100 text-emerald-800" : "text-slate-500 hover:bg-slate-100"}`}>Analisis Butir Soal</button>
+              <button onClick={() => setActiveTab("grafik")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition whitespace-nowrap ${activeTab === "grafik" ? "bg-emerald-100 text-emerald-800" : "text-slate-500 hover:bg-slate-100"}`}>Visualisasi Data</button>
             </div>
 
             {isFetchingResults ? (
@@ -293,7 +318,7 @@ export default function HasilUjianPage() {
                   </Card>
                 </>
               )
-            ) : (
+            ) : activeTab === "soal" ? (
               <div className="space-y-3">
                 {questionAnalysis.map((qa, i) => (
                   <Card key={i} className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -319,6 +344,60 @@ export default function HasilUjianPage() {
                     </div>
                   </Card>
                 ))}
+              </div>
+            ) : (
+              // TAB 3: GRAFIK VISUALISASI
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="p-6">
+                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <BarChart2 className="w-5 h-5 text-emerald-600" />
+                    Distribusi Nilai Siswa
+                  </h3>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={scoreRanges} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <Tooltip 
+                          cursor={{ fill: '#f1f5f9' }}
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Bar dataKey="count" name="Jumlah Siswa" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <BarChart2 className="w-5 h-5 text-amber-600" />
+                    Proporsi Tingkat Kesukaran
+                  </h3>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={difficultyData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {difficultyData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
               </div>
             )}
           </>
