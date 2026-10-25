@@ -9,15 +9,29 @@ import { supabase } from "../../lib/supabase";
 import { isLoggedIn } from "../../lib/auth";
 import type { ActiveSession } from "../../lib/types";
 
+// Fungsi untuk menerjemahkan data dari Database (snake_case) ke TypeScript (camelCase)
+function mapDbSessionToActiveSession(dbS: any): ActiveSession {
+  return {
+    id: dbS.id,
+    examId: dbS.exam_id,
+    studentId: dbS.student_id,
+    studentName: dbS.student_name,
+    className: dbS.class_name,
+    currentQuestion: dbS.current_question || 0,
+    totalQuestions: dbS.total_questions || 0,
+    violations: dbS.violations || 0,
+    lastSeen: dbS.last_seen,
+  };
+}
+
 export default function PantauUjianPage() {
   const router = useRouter();
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [now, setNow] = useState(0); // Inisialisasi 0 agar aman saat SSR
+  const [now, setNow] = useState(0);
 
-  // Update waktu setiap detik untuk menghitung "terakhir terlihat"
   useEffect(() => {
-    setNow(Date.now()); // Set waktu pertama kali di client
+    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -27,9 +41,10 @@ export default function PantauUjianPage() {
       const loggedIn = await isLoggedIn();
       if (!loggedIn) { router.push("/guru/login"); return; }
 
-      // Ambil data awal
+      // Ambil data awal dan terjemahkan
       const { data } = await supabase.from("active_sessions").select("*");
-      if (data) setSessions(data as ActiveSession[]);
+      if (data) setSessions(data.map(mapDbSessionToActiveSession));
+      
       setLoading(false);
 
       // Berlangganan Realtime
@@ -39,7 +54,7 @@ export default function PantauUjianPage() {
           { event: "*", schema: "public", table: "active_sessions" },
           (payload) => {
             if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-              const newSession = payload.new as ActiveSession;
+              const newSession = mapDbSessionToActiveSession(payload.new);
               setSessions(prev => {
                 const existing = prev.find(s => s.id === newSession.id);
                 if (existing) return prev.map(s => s.id === newSession.id ? newSession : s);
@@ -61,7 +76,6 @@ export default function PantauUjianPage() {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Memuat data...</p></div>;
   }
 
-  // Hitung status online berdasarkan last_seen (jika > 30 detik, anggap offline)
   const getStatus = (lastSeen: string) => {
     if (now === 0) return { label: "Memuat", color: "text-slate-500 bg-slate-100", dot: "bg-slate-400" };
     const diff = now - new Date(lastSeen).getTime();
@@ -111,7 +125,7 @@ export default function PantauUjianPage() {
                 <tbody className="divide-y divide-slate-100">
                   {sessions.map((s) => {
                     const status = getStatus(s.lastSeen);
-                    const progressPercent = Math.round((s.currentQuestion / s.totalQuestions) * 100);
+                    const progressPercent = s.totalQuestions > 0 ? Math.round((s.currentQuestion / s.totalQuestions) * 100) : 0;
                     return (
                       <tr key={s.id} className="hover:bg-slate-50/50 transition">
                         <td className="px-4 py-3">
@@ -120,8 +134,8 @@ export default function PantauUjianPage() {
                             {status.label}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-medium text-slate-900">{s.studentName}</td>
-                        <td className="px-4 py-3 text-slate-600">{s.className}</td>
+                        <td className="px-4 py-3 font-medium text-slate-900">{s.studentName || "Siswa"}</td>
+                        <td className="px-4 py-3 text-slate-600">{s.className || "-"}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <div className="flex-1 bg-slate-100 rounded-full h-2">
