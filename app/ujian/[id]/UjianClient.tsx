@@ -10,10 +10,44 @@ import { getSession, saveSession, clearSession } from "../../lib/session";
 import { fetchExamById, submitResult } from "../../lib/db";
 import type { Exam, ExamSession, Question } from "../../lib/types";
 
+// --- FUNGSI BANTUAN PENGACAKAN ---
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function getRandomizedExam(exam: Exam): Exam {
+  const shuffledQuestions = shuffleArray(exam.questions).map(q => {
+    const newQ = { ...q };
+    // Acak opsi jawaban untuk PG dan PG Kompleks
+    if ((newQ.type === "multiple_choice" || newQ.type === "complex_mc") && newQ.options) {
+      if (newQ.optionImages) {
+        // Gabungkan teks dan gambar agar tetap sinkron saat diacak
+        const zipped = newQ.options.map((opt, i) => ({ opt, img: newQ.optionImages![i] }));
+        const shuffled = shuffleArray(zipped);
+        newQ.options = shuffled.map(z => z.opt);
+        newQ.optionImages = shuffled.map(z => z.img);
+      } else {
+        newQ.options = shuffleArray(newQ.options);
+      }
+    }
+    // Acak urutan pasangan untuk Menjodohkan
+    if (newQ.type === "matching" && newQ.pairs) {
+      newQ.pairs = shuffleArray(newQ.pairs);
+    }
+    return newQ;
+  });
+  return { ...exam, questions: shuffledQuestions };
+}
+
+// --- FUNGSI PENILAIAN ---
 function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
   if (jawabanSiswa === undefined || jawabanSiswa === null) return false;
   const normalize = (s: string) => String(s).trim().toLowerCase();
-
   switch (q.type) {
     case "multiple_choice": return jawabanSiswa === q.correctAnswer;
     case "complex_mc":
@@ -33,7 +67,6 @@ function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
     case "short_answer":
       const accepted = q.acceptedAnswers || [];
       return accepted.some((a) => normalize(a) === normalize(jawabanSiswa));
-    case "essay": return false;
     default: return false;
   }
 }
@@ -71,7 +104,9 @@ export function UjianClient() {
       const found = await fetchExamById(examId);
       if (!found || !found.isActive) { router.push("/siswa"); return; }
       
-      setExam(found);
+      // ACAK SOAL DAN OPSI DI SINI
+      const randomizedExam = getRandomizedExam(found);
+      setExam(randomizedExam);
       setNama(profile.full_name);
 
       const existing = getSession(examId);
@@ -83,10 +118,19 @@ export function UjianClient() {
         setSisaWaktu(Math.max(0, found.duration - elapsed));
         setIsResume(true);
       } else {
+        // Inisialisasi jawaban untuk soal "Mengurutkan" dengan urutan acak
+        const initialAnswers: Record<string, any> = {};
+        randomizedExam.questions.forEach(q => {
+          if (q.type === "ordering" && q.items) {
+            initialAnswers[q.id] = shuffleArray(q.items);
+          }
+        });
+
         saveSession({
           examId, studentId: user.id, studentName: profile.full_name,
-          answers: {}, startedAt: new Date().toISOString(), violations: 0, lastUpdated: new Date().toISOString()
+          answers: initialAnswers, startedAt: new Date().toISOString(), violations: 0, lastUpdated: new Date().toISOString()
         });
+        setJawaban(initialAnswers);
         setSisaWaktu(found.duration);
       }
       setLoading(false);
@@ -147,6 +191,7 @@ export function UjianClient() {
     setSelesai(true);
 
     let benar = 0;
+    // Penilaian tetap menggunakan `exam` yang sudah diacak, karena ID soal dan konten jawaban tidak berubah
     exam.questions.forEach(q => { if (isJawabanBenar(q, jawaban[q.id])) benar++; });
     const nilai = Math.round((benar / exam.questions.length) * 100);
 
@@ -156,7 +201,8 @@ export function UjianClient() {
       await submitResult({
         id: crypto.randomUUID(), examId: exam.id, examTitle: exam.title,
         studentId: user.id, studentName: nama, className: profile?.class_name || "-",
-        score: nilai, correct: benar, total: exam.questions.length, violations: violationsRef.current, submittedAt: new Date().toISOString(), answers: jawaban,
+        score: nilai, correct: benar, total: exam.questions.length, violations: violationsRef.current, submittedAt: new Date().toISOString(),
+        answers: jawaban,
       });
       localStorage.setItem("hasilUjian", JSON.stringify({
         nama, examTitle: exam.title, benar, total: exam.questions.length, nilai, violations: violationsRef.current
@@ -169,7 +215,7 @@ export function UjianClient() {
   }
 
   if (loading || !exam) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Memuat ujian...</p></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Menyiapkan soal...</p></div>;
   }
 
   if (showStartPrompt) {
@@ -181,7 +227,12 @@ export function UjianClient() {
           <p className="text-sm text-slate-500 mb-6">{exam.questions.length} soal • {Math.floor(exam.duration / 60)} menit</p>
           <div className="bg-amber-50 p-4 rounded-xl text-left text-xs text-amber-800 mb-6">
             <p className="font-bold mb-1">Perhatian:</p>
-            <ul className="list-disc pl-4 space-y-1"><li>Layar penuh wajib.</li><li>Jangan pindah tab.</li><li>Jawaban auto-save.</li></ul>
+            <ul className="list-disc pl-4 space-y-1">
+              <li>Layar penuh wajib.</li>
+              <li>Jangan pindah tab.</li>
+              <li>Jawaban auto-save.</li>
+              <li>Urutan soal & opsi diacak secara unik untuk Anda.</li>
+            </ul>
           </div>
           <Button onClick={startExam} className="w-full">Mulai Ujian</Button>
         </Card>
@@ -215,7 +266,6 @@ export function UjianClient() {
             <p className="text-sm font-semibold text-slate-500">Soal {nomorSoal + 1} / {exam.questions.length}</p>
             {savedFlash && <span className="text-xs text-emerald-600">Tersimpan</span>}
           </div>
-          {/* Render Pertanyaan sebagai HTML */}
           <div className="text-lg font-semibold mb-4 prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: soal.question }} />
           
           {soal.image && <img src={soal.image} className="max-h-64 mb-4 rounded-xl border" />}
@@ -228,7 +278,6 @@ export function UjianClient() {
                 <button key={i} onClick={() => updateJawaban(soal.id, identifier)} className={`w-full text-left p-3 rounded-xl border-2 flex items-center gap-3 transition ${ans === identifier ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"}`}>
                   <span className="w-7 h-7 rounded-full bg-white border flex items-center justify-center font-bold shrink-0">{String.fromCharCode(65+i)}</span>
                   {img && <img src={img} className="h-16 object-contain rounded border bg-white" alt={`Opsi ${i+1}`} />}
-                  {/* Render Opsi sebagai HTML */}
                   <div className="font-medium prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: opt }} />
                 </button>
               );
@@ -277,11 +326,9 @@ export function UjianClient() {
                   const curr = ans || {};
                   return (
                     <div key={i} className="flex flex-col sm:flex-row gap-2 items-center">
-                      {/* Render Kiri sebagai HTML */}
                       <div className="flex-1 w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: p.left }} />
                       <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-3 rounded-xl border-2 border-slate-200 bg-white text-sm focus:border-blue-500">
                         <option value="" disabled>-- Pilih Pasangan --</option>
-                        {/* Untuk dropdown, kita hilangkan tag HTML agar tampil rapi */}
                         {soal.pairs?.map(pr => <option key={pr.right} value={pr.right}>{pr.right.replace(/<[^>]*>?/gm, '')}</option>)}
                       </select>
                     </div>
@@ -295,7 +342,6 @@ export function UjianClient() {
                 {(ans && Array.isArray(ans) ? ans : soal.items || []).map((item, i, arr) => (
                   <div key={i} className="flex gap-2 items-center p-2 bg-white border rounded-xl">
                     <span className="w-6 text-center font-bold text-slate-400">{i+1}</span>
-                    {/* Render item sebagai HTML */}
                     <div className="flex-1 text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item }} />
                     <div className="flex flex-col gap-1">
                       <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className="p-1 bg-slate-100 rounded hover:bg-slate-200 disabled:opacity-30">▲</button>
