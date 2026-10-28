@@ -11,10 +11,17 @@ import type { ActiveSession } from "../../lib/types";
 
 function mapDbSessionToActiveSession(dbS: any): ActiveSession {
   return {
-    id: dbS.id, examId: dbS.exam_id, studentId: dbS.student_id,
-    studentName: dbS.student_name, className: dbS.class_name,
-    currentQuestion: dbS.current_question || 0, totalQuestions: dbS.total_questions || 0,
-    violations: dbS.violations || 0, lastSeen: dbS.last_seen,
+    id: dbS.id, 
+    examId: dbS.exam_id, 
+    studentId: dbS.student_id,
+    studentName: dbS.student_name, 
+    className: dbS.class_name,
+    currentQuestion: dbS.current_question || 0, 
+    totalQuestions: dbS.total_questions || 0,
+    violations: dbS.violations || 0, 
+    lastSeen: dbS.last_seen,
+    startedAt: dbS.started_at, // <-- TAMBAHKAN INI
+    tabId: dbS.tab_id,         // <-- TAMBAHKAN INI
   };
 }
 
