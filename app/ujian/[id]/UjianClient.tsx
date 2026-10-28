@@ -68,10 +68,8 @@ export function UjianClient() {
   const violationsRef = useRef(0);
   const skipAutoSaveRef = useRef(true);
   
-  // Ref untuk ID Tab Unik
   const tabIdRef = useRef<string>("");
 
-  // Inisialisasi Tab ID menggunakan sessionStorage (hilang saat tab ditutup)
   useEffect(() => {
     let tid = sessionStorage.getItem("ujianku_tab_id");
     if (!tid) {
@@ -95,7 +93,6 @@ export function UjianClient() {
       const found = await fetchExamForStudent(examId);
       if (!found || !found.isActive) { router.push("/siswa"); return; }
 
-      // --- SINKRONISASI SESI DI SERVER ---
       const sessionId = `${examId}_${user.id}`;
       const tabId = tabIdRef.current;
       
@@ -104,7 +101,6 @@ export function UjianClient() {
       let startedAt = new Date().toISOString();
 
       if (existingSession) {
-        // Cek jika perangkat lain aktif (ping < 15 detik yang lalu) dan Tab ID berbeda
         const isOtherDeviceActive = (Date.now() - new Date(existingSession.last_seen).getTime() < 15000) && existingSession.tab_id !== tabId;
         
         if (isOtherDeviceActive) {
@@ -113,13 +109,9 @@ export function UjianClient() {
           return;
         }
 
-        // Ambil waktu mulai dari server agar timer identik
         startedAt = existingSession.started_at;
-        
-        // Ambil alih sesi (update tab_id)
         await supabase.from("active_sessions").update({ tab_id: tabId, last_seen: new Date().toISOString() }).eq("id", sessionId);
       } else {
-        // Buat sesi baru di server
         await supabase.from("active_sessions").insert({
           id: sessionId,
           exam_id: examId,
@@ -134,7 +126,6 @@ export function UjianClient() {
           tab_id: tabId
         });
       }
-      // ------------------------------------
 
       const randomizedExam = getRandomizedExam(found, user.id);
       setExam(randomizedExam);
@@ -147,7 +138,6 @@ export function UjianClient() {
         setViolations(existing.violations);
         violationsRef.current = existing.violations;
         
-        // Gunakan startedAt dari server
         const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
         const sisa = Math.max(0, found.duration - elapsed);
         setSisaWaktu(sisa);
@@ -174,7 +164,6 @@ export function UjianClient() {
     loadExam();
   }, [examId, router]);
 
-  // SINKRONISASI PING KE SERVER
   useEffect(() => {
     if (!exam || !studentData || showStartPrompt || selesai) return;
     const sync = async () => {
@@ -365,7 +354,7 @@ export function UjianClient() {
 
       <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
         
-        {/* SIDEBAR KIRI */}
+        {/* SIDEBAR KIRI (DESKTOP) */}
         <aside className="hidden lg:flex flex-col w-80 shrink-0 h-full gap-4">
           <div className="bg-slate-800 border border-slate-700 shadow-lg rounded-2xl p-5 shrink-0">
             <div className="flex items-center gap-3 mb-4">
@@ -408,9 +397,10 @@ export function UjianClient() {
           </div>
         </aside>
 
-        {/* AREA SOAL */}
+        {/* AREA SOAL (KANAN & MOBILE) */}
         <main className="flex-1 flex flex-col h-full overflow-hidden">
           
+          {/* HEADER MOBILE (PESERTA & TIMER) */}
           <div className="lg:hidden p-4 mb-4 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
@@ -556,6 +546,23 @@ export function UjianClient() {
             </div>
           </div>
 
+          {/* --- NAVIGASI SOAL MOBILE (KHUSUS HP) --- */}
+          <div className="lg:hidden bg-slate-800 border border-slate-700 shadow-lg rounded-2xl p-4 shrink-0 mb-4">
+            <div className="flex justify-between items-center mb-3">
+              <p className="text-xs font-semibold text-slate-300">Navigasi Soal</p>
+              <p className="text-[10px] text-slate-500">{exam.questions.length} Butir</p>
+            </div>
+            <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-32 overflow-y-auto pr-1 content-start">
+              {exam.questions.map((q, i) => {
+                const answered = jawaban[q.id] !== undefined && (Array.isArray(jawaban[q.id]) ? jawaban[q.id].length > 0 : jawaban[q.id] !== "");
+                return (
+                  <button key={q.id} onClick={() => setNomorSoal(i)} className={`h-9 rounded-lg font-bold text-xs transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* TOMBOL AKSI BAWAH */}
           <div className="flex justify-between gap-4 shrink-0">
             <button 
               onClick={() => setNomorSoal(n => Math.max(0, n-1))} 
@@ -568,9 +575,9 @@ export function UjianClient() {
             {nomorSoal === exam.questions.length - 1 ? (
               <button 
                 onClick={() => submitExam(false)} 
-                className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.2)] transition flex items-center justify-center gap-2 lg:hidden"
+                className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.2)] transition flex items-center justify-center gap-2"
               >
-                <CheckCircle2 className="w-5 h-5"/> Selesai & Kirim
+                <CheckCircle2 className="w-5 h-5"/> Selesai
               </button>
             ) : (
               <button 
