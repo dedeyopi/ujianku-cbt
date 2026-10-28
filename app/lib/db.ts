@@ -176,3 +176,49 @@ export async function syncActiveSession(session: ActiveSession): Promise<void> {
 export async function removeActiveSession(sessionId: string): Promise<void> {
   await supabase.from("active_sessions").delete().eq("id", sessionId);
 }
+
+// --- FUNGSI BANK SOAL ---
+
+export async function fetchBankQuestions(): Promise<Question[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("questions")
+    .select("*")
+    .is("exam_id", null) // Hanya yang tidak terikat ujian
+    .eq("owner_id", user.id) // Hanya milik guru yang login
+    .order("subject", { ascending: true });
+
+  if (error) return [];
+  return data.map(mapDbQuestionToQuestion);
+}
+
+export async function saveQuestionToBank(q: Question, subject: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const dbQ = {
+    id: crypto.randomUUID(), // ID baru untuk bank
+    exam_id: null,
+    owner_id: user.id,
+    subject: subject,
+    type: q.type,
+    question: q.question,
+    image_url: q.image,
+    options: q.options || null,
+    option_images: q.optionImages || null,
+    correct_answer: {
+      correctAnswer: q.correctAnswer, correctAnswers: q.correctAnswers, trueFalseAnswer: q.trueFalseAnswer,
+      statements: q.statements, pairs: q.pairs, items: q.items, acceptedAnswers: q.acceptedAnswers,
+    }
+  };
+
+  const { error } = await supabase.from("questions").insert(dbQ);
+  return !error;
+}
+
+export async function deleteBankQuestion(id: string): Promise<boolean> {
+  const { error } = await supabase.from("questions").delete().eq("id", id);
+  return !error;
+}

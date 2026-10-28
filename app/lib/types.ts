@@ -37,6 +37,9 @@ export type Question = {
   
   // Esai
   minWords?: number;
+  examId?: string | null;
+  ownerId?: string;
+  subject?: string;
 };
 
 export type Exam = {

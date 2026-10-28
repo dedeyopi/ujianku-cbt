@@ -6,14 +6,14 @@ import {
   ArrowLeft, Save, Plus, Trash2, Edit3, Check, X, BookOpen,
   CheckCircle2, AlertCircle, ListChecks, ToggleLeft, Type,
   ListTodo, Shuffle, Link, FileText, Upload, FileSpreadsheet, Image as ImageIcon,
-  Key, Calendar
+  Key, Calendar, BookMarked
 } from "lucide-react";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { Input } from "./Input";
 import { ImageUploader } from "./ImageUploader";
 import { TextEditor } from "./TextEditor";
-import { fetchExamById, saveExam } from "../lib/db";
+import { fetchExamById, saveExam, fetchBankQuestions, saveQuestionToBank } from "../lib/db";
 import { isLoggedIn } from "../lib/auth";
 import { downloadTemplateImport, parseExcelToQuestions } from "../lib/excel";
 import type { Exam, Question, QuestionType } from "../lib/types";
@@ -69,6 +69,11 @@ export function ExamEditor({ examId }: Props) {
   const [isImporting, setIsImporting] = useState(false);
   const [showOptImage, setShowOptImage] = useState<Record<number, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // State Bank Soal
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [bankQuestions, setBankQuestions] = useState<Question[]>([]);
+  const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadData() {
@@ -134,6 +139,16 @@ export function ExamEditor({ examId }: Props) {
     setEditingQuestion(null); setIsNewQuestion(false); setShowOptImage({}); 
   }
 
+  async function handleSaveToBank() {
+    if (!editingQuestion || !exam) return;
+    const subject = prompt("Simpan ke Bank Soal.\nMasukkan Mata Pelajaran (untuk kategori):", exam.subject || "Umum");
+    if (subject === null) return; // Batal
+    
+    const success = await saveQuestionToBank(editingQuestion, subject);
+    if (success) alert("Soal berhasil disimpan ke Bank Soal!");
+    else alert("Gagal menyimpan ke Bank Soal.");
+  }
+
   function deleteQuestion(id: string) {
     if (!exam || !confirm("Hapus soal ini?")) return;
     updateExam({ questions: exam.questions.filter((q) => q.id !== id) });
@@ -149,6 +164,26 @@ export function ExamEditor({ examId }: Props) {
       alert(`Berhasil mengimpor ${imported.length} soal!`);
     } catch (err) { alert("Gagal mengimpor."); }
     setIsImporting(false);
+  }
+
+  // Bank Soal Logic
+  async function openBank() {
+    const data = await fetchBankQuestions();
+    setBankQuestions(data);
+    setSelectedBankIds([]);
+    setBankModalOpen(true);
+  }
+
+  function addFromBank() {
+    if (!exam || selectedBankIds.length === 0) return;
+    
+    // Ambil soal yang dipilih, beri ID baru, dan masukkan ke ujian
+    const toAdd = bankQuestions
+      .filter(q => selectedBankIds.includes(q.id))
+      .map(q => ({ ...q, id: crypto.randomUUID(), examId: exam.id, ownerId: undefined, subject: undefined }));
+      
+    updateExam({ questions: [...exam.questions, ...toAdd] });
+    setBankModalOpen(false);
   }
 
   if (loading || !exam) {
@@ -187,24 +222,14 @@ export function ExamEditor({ examId }: Props) {
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Waktu Mulai (Opsional)</label>
                 <div className="relative">
                   <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input 
-                    type="datetime-local" 
-                    value={exam.startTime ? new Date(new Date(exam.startTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""} 
-                    onChange={(e) => updateExam({ startTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })} 
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" 
-                  />
+                  <input type="datetime-local" value={exam.startTime ? new Date(new Date(exam.startTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""} onChange={(e) => updateExam({ startTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Waktu Selesai (Opsional)</label>
                 <div className="relative">
                   <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input 
-                    type="datetime-local" 
-                    value={exam.endTime ? new Date(new Date(exam.endTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""} 
-                    onChange={(e) => updateExam({ endTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })} 
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" 
-                  />
+                  <input type="datetime-local" value={exam.endTime ? new Date(new Date(exam.endTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""} onChange={(e) => updateExam({ endTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" />
                 </div>
               </div>
             </div>
@@ -214,20 +239,10 @@ export function ExamEditor({ examId }: Props) {
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Key className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input 
-                    type="text" 
-                    value={exam.token || ""} 
-                    onChange={(e) => updateExam({ token: e.target.value.toUpperCase() })} 
-                    placeholder="Contoh: X7K9P2" 
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition font-mono tracking-widest uppercase" 
-                    maxLength={10}
-                  />
+                  <input type="text" value={exam.token || ""} onChange={(e) => updateExam({ token: e.target.value.toUpperCase() })} placeholder="Contoh: X7K9P2" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition font-mono tracking-widest uppercase" maxLength={10} />
                 </div>
-                <Button variant="secondary" onClick={generateToken} type="button">
-                  Buat Token
-                </Button>
+                <Button variant="secondary" onClick={generateToken} type="button">Buat Token</Button>
               </div>
-              <p className="text-xs text-slate-500 mt-1">Jika diisi, siswa harus memasukkan token ini untuk masuk.</p>
             </div>
           </div>
         </Card>
@@ -239,13 +254,12 @@ export function ExamEditor({ examId }: Props) {
               <p className="text-xs text-slate-500">Mendukung 8 tipe soal</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="secondary" size="sm" onClick={downloadTemplateImport}><FileSpreadsheet className="w-4 h-4 mr-1.5 text-emerald-600" />Template</Button>
-              <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting}><Upload className="w-4 h-4 mr-1.5 text-blue-600" />{isImporting ? "..." : "Import"}</Button>
+              <Button variant="secondary" size="sm" onClick={openBank} className="border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"><BookMarked className="w-4 h-4 mr-1.5" />Ambil dari Bank</Button>
+              <Button variant="secondary" size="sm" onClick={downloadTemplateImport}><FileSpreadsheet className="w-4 h-4 mr-1.5 text-slate-600" />Template</Button>
+              <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting}><Upload className="w-4 h-4 mr-1.5 text-slate-600" />{isImporting ? "..." : "Import"}</Button>
               <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleImportExcel} />
               {!editingQuestion && !pilihTipe && (
-                <button onClick={() => setPilihTipe(true)} className="inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] px-3 py-1.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
-                  <Plus className="w-4 h-4 mr-1.5" />Tambah
-                </button>
+                <button onClick={() => setPilihTipe(true)} className="inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] px-3 py-1.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"><Plus className="w-4 h-4 mr-1.5" />Tambah</button>
               )}
             </div>
           </div>
@@ -278,14 +292,6 @@ export function ExamEditor({ examId }: Props) {
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 uppercase mb-2 inline-block">{TIPE_LABEL[q.type]}</span>
                   <div className="font-medium text-slate-900 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
                   {q.image && <img src={q.image} className="max-h-24 rounded-lg border border-slate-200 mb-2" />}
-                  
-                  {q.type === "multiple_choice" && <div className="text-xs text-emerald-600">Kunci: {q.correctAnswer?.replace(/<[^>]*>?/gm, '')}</div>}
-                  {q.type === "complex_mc" && <div className="text-xs text-emerald-600">Kunci: {q.correctAnswers?.map(a => a.replace(/<[^>]*>?/gm, '')).join(", ")}</div>}
-                  {q.type === "true_false" && <div className="text-xs text-emerald-600">Kunci: {q.trueFalseAnswer ? "Benar" : "Salah"}</div>}
-                  {q.type === "multi_true_false" && <div className="text-xs text-emerald-600">{q.statements?.length} Pernyataan</div>}
-                  {q.type === "matching" && <div className="text-xs text-emerald-600">{q.pairs?.length} Pasangan</div>}
-                  {q.type === "ordering" && <div className="text-xs text-emerald-600">{q.items?.length} Item</div>}
-                  {q.type === "short_answer" && <div className="text-xs text-emerald-600">Diterima: {q.acceptedAnswers?.join(" / ")}</div>}
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button onClick={() => openEditQuestion(q)} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg"><Edit3 className="w-4 h-4" /></button>
@@ -305,11 +311,7 @@ export function ExamEditor({ examId }: Props) {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Pertanyaan / Instruksi</label>
-                  <TextEditor 
-                    value={editingQuestion.question} 
-                    onChange={(val) => setEditingQuestion({ ...editingQuestion, question: val })} 
-                    placeholder="Tulis pertanyaan di sini..."
-                  />
+                  <TextEditor value={editingQuestion.question} onChange={(val) => setEditingQuestion({ ...editingQuestion, question: val })} placeholder="Tulis pertanyaan di sini..." />
                 </div>
                 <ImageUploader value={editingQuestion.image} onChange={(img) => setEditingQuestion({ ...editingQuestion, image: img })} />
 
@@ -319,22 +321,10 @@ export function ExamEditor({ examId }: Props) {
                       <div key={i} className="flex flex-col gap-2 p-2 bg-white rounded-lg border border-slate-100 shadow-sm">
                         <div className="flex gap-2 items-center">
                           <button onClick={() => setEditingQuestion({...editingQuestion, correctAnswer: opt || `Opsi ${i+1}`})} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ${editingQuestion.correctAnswer === (opt || `Opsi ${i+1}`) ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300"}`}>{editingQuestion.correctAnswer === (opt || `Opsi ${i+1}`) ? <Check className="w-4 h-4"/> : String.fromCharCode(65+i)}</button>
-                          
-                          <div className="flex-1">
-                            <TextEditor 
-                              value={opt} 
-                              onChange={(val) => { const o = [...(editingQuestion.options||[])]; o[i] = val; setEditingQuestion({...editingQuestion, options: o, correctAnswer: editingQuestion.correctAnswer === opt ? val : editingQuestion.correctAnswer}) }} 
-                              placeholder={`Teks Opsi ${String.fromCharCode(65+i)}`}
-                            />
-                          </div>
-
+                          <div className="flex-1"><TextEditor value={opt} onChange={(val) => { const o = [...(editingQuestion.options||[])]; o[i] = val; setEditingQuestion({...editingQuestion, options: o, correctAnswer: editingQuestion.correctAnswer === opt ? val : editingQuestion.correctAnswer}) }} placeholder={`Teks Opsi ${String.fromCharCode(65+i)}`} /></div>
                           <button onClick={() => setShowOptImage(prev => ({...prev, [i]: !prev[i]}))} className={`p-2 rounded-lg border ${showOptImage[i] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} title="Tambah Gambar"><ImageIcon className="w-4 h-4"/></button>
                         </div>
-                        {showOptImage[i] && (
-                          <div className="mt-2 pl-10">
-                             <ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} />
-                          </div>
-                        )}
+                        {showOptImage[i] && <div className="mt-2 pl-10"><ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} /></div>}
                       </div>
                     ))}
                   </div>
@@ -354,22 +344,10 @@ export function ExamEditor({ examId }: Props) {
                               const newAns = isSelected ? curr.filter(a => a !== identifier) : [...curr, identifier];
                               setEditingQuestion({...editingQuestion, correctAnswers: newAns});
                             }} className="w-5 h-5 accent-emerald-600 shrink-0" />
-                            
-                            <div className="flex-1">
-                              <TextEditor 
-                                value={opt} 
-                                onChange={(val) => { const o = [...(editingQuestion.options||[])]; o[i] = val; setEditingQuestion({...editingQuestion, options: o}) }} 
-                                placeholder={`Teks Opsi ${String.fromCharCode(65+i)}`}
-                              />
-                            </div>
-                            
+                            <div className="flex-1"><TextEditor value={opt} onChange={(val) => { const o = [...(editingQuestion.options||[])]; o[i] = val; setEditingQuestion({...editingQuestion, options: o}) }} placeholder={`Teks Opsi ${String.fromCharCode(65+i)}`} /></div>
                             <button onClick={() => setShowOptImage(prev => ({...prev, [i]: !prev[i]}))} className={`p-2 rounded-lg border ${showOptImage[i] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} title="Tambah Gambar"><ImageIcon className="w-4 h-4"/></button>
                           </div>
-                          {showOptImage[i] && (
-                            <div className="mt-2 pl-8">
-                              <ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} />
-                            </div>
-                          )}
+                          {showOptImage[i] && <div className="mt-2 pl-8"><ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} /></div>}
                         </div>
                       );
                     })}
@@ -446,8 +424,9 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 )}
 
-                <div className="flex gap-2 pt-4 border-t border-slate-100">
+                <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-slate-100">
                   <Button variant="secondary" className="flex-1" onClick={cancelQuestionForm}>Batal</Button>
+                  <Button variant="secondary" className="flex-1 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100" onClick={handleSaveToBank}><BookMarked className="w-4 h-4 mr-1.5" />Simpan ke Bank</Button>
                   <button onClick={saveQuestion} className="flex-1 inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"><Save className="w-4 h-4 mr-1.5" />Simpan Soal</button>
                 </div>
               </div>
@@ -455,6 +434,61 @@ export function ExamEditor({ examId }: Props) {
           )}
         </div>
       </div>
+
+      {/* MODAL BANK SOAL */}
+      {bankModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 sm:p-6">
+          <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col animate-fade-in-up">
+            <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-2xl">
+              <div>
+                <h3 className="font-bold text-slate-900">Pilih Soal dari Bank</h3>
+                <p className="text-xs text-slate-500">Pilih soal yang ingin ditambahkan ke ujian ini.</p>
+              </div>
+              <button onClick={() => setBankModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto space-y-3 bg-slate-50/50">
+              {bankQuestions.length === 0 ? (
+                <div className="text-center py-10">
+                  <BookMarked className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500">Bank Soal masih kosong.</p>
+                </div>
+              ) : (
+                bankQuestions.map(q => {
+                  const isSelected = selectedBankIds.includes(q.id);
+                  return (
+                    <div key={q.id} onClick={() => {
+                      setSelectedBankIds(prev => isSelected ? prev.filter(id => id !== q.id) : [...prev, q.id]);
+                    }} className={`p-4 bg-white border-2 rounded-xl cursor-pointer transition ${isSelected ? 'border-emerald-500 ring-1 ring-emerald-500/20' : 'border-slate-200 hover:border-emerald-300'}`}>
+                      <div className="flex gap-3">
+                        <div className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300'}`}>
+                          {isSelected && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase">{TIPE_LABEL[q.type]}</span>
+                            <span className="text-xs text-slate-400">{q.subject}</span>
+                          </div>
+                          <div className="font-medium text-slate-900 mb-1 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
+                          {q.image && <img src={q.image} className="max-h-16 rounded border mt-2" />}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            
+            <div className="p-4 border-t bg-slate-50 rounded-b-2xl flex justify-between items-center">
+              <span className="text-sm text-slate-500">{selectedBankIds.length} soal dipilih</span>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => setBankModalOpen(false)}>Batal</Button>
+                <Button onClick={addFromBank} disabled={selectedBankIds.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white">Tambahkan ke Ujian</Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
     </main>
   );
 }

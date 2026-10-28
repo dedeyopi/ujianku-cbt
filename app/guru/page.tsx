@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Plus, LogOut, FileText, Clock, BookOpen, TrendingUp, Trash2, Edit3, Users, Trophy, Copy, MonitorPlay
+  Plus, LogOut, FileText, Clock, BookOpen, TrendingUp, Trash2, Edit3, Users, Trophy, Copy, MonitorPlay, BookMarked
 } from "lucide-react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { Logo } from "../components/Logo"; // Import Logo
+import { Logo } from "../components/Logo";
 import { fetchExams, removeExam, duplicateExam } from "../lib/db";
 import { isLoggedIn, logout } from "../lib/auth"; 
 import type { Exam } from "../lib/types";
@@ -62,22 +62,31 @@ export default function DashboardGuruPage() {
   return (
     <main className="min-h-screen bg-slate-50">
       <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Logo className="w-10 h-10" /> {/* Gunakan Logo */}
+            <Logo className="w-10 h-10" />
             <div>
               <h1 className="font-bold text-slate-900 leading-tight">Ujian<span className="text-emerald-600">Ku</span></h1>
               <p className="text-xs text-slate-500 leading-tight">Panel Guru</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="secondary" size="sm" onClick={() => router.push("/guru/bank-soal")}>
+              <BookMarked className="w-4 h-4 mr-1.5" />Bank Soal
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => router.push("/guru/pantau")}>
               <MonitorPlay className="w-4 h-4 mr-1.5" />Pantau
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => router.push("/guru/hasil")}><Trophy className="w-4 h-4 mr-1.5" />Hasil</Button>
-            <Button variant="secondary" size="sm" onClick={() => router.push("/guru/siswa")}><Users className="w-4 h-4 mr-1.5" />Siswa</Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout}><LogOut className="w-4 h-4 mr-1.5" />Keluar</Button>
+            <Button variant="secondary" size="sm" onClick={() => router.push("/guru/hasil")}>
+              <Trophy className="w-4 h-4 mr-1.5" />Hasil
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => router.push("/guru/siswa")}>
+              <Users className="w-4 h-4 mr-1.5" />Siswa
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="w-4 h-4 mr-1.5" />Keluar
+            </Button>
           </div>
         </div>
       </header>
