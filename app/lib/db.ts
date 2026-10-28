@@ -1,17 +1,28 @@
 import { supabase } from "./supabase";
 import type { Exam, Question, ExamResult, ActiveSession } from "./types";
 
+// Fungsi pengaman untuk mengubah data JSONB (String -> Objek)
+function safeParse(json: any) {
+  if (typeof json === 'string') {
+    try { return JSON.parse(json); } catch(e) { return {}; }
+  }
+  return json || {};
+}
+
 // --- FUNGSI BANTU (Mapping) ---
 function mapDbQuestionToQuestion(dbQ: any): Question {
-  let correctAns = dbQ.correct_answer || {};
-  // Perbaikan: Jika Supabase mengembalikan string JSON, kita ubah jadi objek
-  if (typeof correctAns === 'string') {
-    try { correctAns = JSON.parse(correctAns); } catch(e) { correctAns = {}; }
-  }
+  const correctAns = safeParse(dbQ.correct_answer);
+  const opts = safeParse(dbQ.options);
+  const optImgs = safeParse(dbQ.option_images);
 
   return {
-    id: dbQ.id, type: dbQ.type, question: dbQ.question, image: dbQ.image_url,
-    options: dbQ.options, optionImages: dbQ.option_images, ...correctAns, 
+    id: dbQ.id, 
+    type: dbQ.type, 
+    question: dbQ.question, 
+    image: dbQ.image_url,
+    options: Array.isArray(opts) ? opts : undefined, 
+    optionImages: Array.isArray(optImgs) ? optImgs : undefined, 
+    ...correctAns, 
   };
 }
 
@@ -42,6 +53,33 @@ export async function fetchExamById(id: string): Promise<Exam | null> {
   return {
     id: exam.id, title: exam.title, subject: exam.subject, duration: exam.duration, isActive: exam.is_active, createdAt: exam.created_at,
     questions: (exam.questions || []).sort((a: any, b: any) => a.order_index - b.order_index).map(mapDbQuestionToQuestion),
+  };
+}
+
+// Fungsi aman untuk siswa (tanpa kunci jawaban)
+export async function fetchExamForStudent(id: string): Promise<Exam | null> {
+  const { data: exam, error } = await supabase.from("exams").select("*, questions(*)").eq("id", id).single();
+  if (error || !exam) return null;
+
+  return {
+    id: exam.id, title: exam.title, subject: exam.subject, duration: exam.duration, isActive: exam.is_active, createdAt: exam.created_at,
+    questions: (exam.questions || []).sort((a: any, b: any) => a.order_index - b.order_index).map((dbQ: any) => {
+        const correctAns = safeParse(dbQ.correct_answer);
+        const opts = safeParse(dbQ.options);
+        const optImgs = safeParse(dbQ.option_images);
+        
+        const q: Question = {
+          id: dbQ.id, type: dbQ.type, question: dbQ.question, image: dbQ.image_url,
+          options: Array.isArray(opts) ? opts : undefined, 
+          optionImages: Array.isArray(optImgs) ? optImgs : undefined,
+        };
+        
+        if (q.type === "multi_true_false" && correctAns.statements) q.statements = correctAns.statements.map((st: any) => ({ text: st.text }));
+        if (q.type === "matching" && correctAns.pairs) q.pairs = correctAns.pairs;
+        if (q.type === "ordering" && correctAns.items) q.items = correctAns.items;
+        
+        return q;
+      }),
   };
 }
 
@@ -76,7 +114,6 @@ export async function duplicateExam(examId: string): Promise<boolean> {
     isActive: false,
     questions: exam.questions.map(q => ({ ...q, id: crypto.randomUUID() }))
   };
-  
   return await saveExam(newExam);
 }
 
@@ -98,7 +135,9 @@ export async function fetchResultsByExam(examId: string): Promise<ExamResult[]> 
     id: r.id, examId: r.exam_id, examTitle: "", studentId: r.student_id,
     studentName: r.users?.full_name || "Siswa", className: r.users?.class_name || "-",
     score: r.score, correct: r.correct, total: r.total, violations: r.violations,
-    submittedAt: r.submitted_at, answers: r.answers, manualGrades: r.manual_grades,
+    submittedAt: r.submitted_at, 
+    answers: safeParse(r.answers), // Parsing aman
+    manualGrades: safeParse(r.manual_grades), // Parsing aman
   }));
 }
 
@@ -117,74 +156,17 @@ export async function updateResultGrades(resultId: string, newScore: number, man
   const { error } = await supabase.from("results").update({ score: newScore, manual_grades: manualGrades }).eq("id", resultId);
   return !error;
 }
+
 // --- FUNGSI LIVE MONITOR ---
 export async function syncActiveSession(session: ActiveSession): Promise<void> {
-  const { error } = await supabase.from("active_sessions").upsert({
-    id: session.id,
-    exam_id: session.examId,
-    student_id: session.studentId,
-    student_name: session.studentName,
-    class_name: session.className,
-    current_question: session.currentQuestion,
-    total_questions: session.totalQuestions,
-    violations: session.violations,
-    last_seen: new Date().toISOString(),
+  await supabase.from("active_sessions").upsert({
+    id: session.id, exam_id: session.examId, student_id: session.studentId,
+    student_name: session.studentName, class_name: session.className,
+    current_question: session.currentQuestion, total_questions: session.totalQuestions,
+    violations: session.violations, last_seen: new Date().toISOString(),
   });
-  if (error) {
-    console.error("Gagal sinkronisasi Live Monitor:", error.message);
-  }
 }
 
 export async function removeActiveSession(sessionId: string): Promise<void> {
   await supabase.from("active_sessions").delete().eq("id", sessionId);
-}
-
-// --- FUNGSI AMAN UNTUK SISWA (TANPA KUNCI JAWABAN) ---
-export async function fetchExamForStudent(id: string): Promise<Exam | null> {
-  const { data: exam, error } = await supabase
-    .from("exams")
-    .select("*, questions(*)")
-    .eq("id", id)
-    .single();
-
-  if (error || !exam) return null;
-
-  return {
-    id: exam.id,
-    title: exam.title,
-    subject: exam.subject,
-    duration: exam.duration,
-    isActive: exam.is_active,
-    createdAt: exam.created_at,
-    questions: (exam.questions || [])
-      .sort((a: any, b: any) => a.order_index - b.order_index)
-      .map((dbQ: any) => {
-        // Ambil data soal dasar
-        const q: Question = {
-          id: dbQ.id,
-          type: dbQ.type,
-          question: dbQ.question,
-          image: dbQ.image_url,
-          options: dbQ.options,
-          optionImages: dbQ.option_images,
-        };
-        
-        // JANGAN kirim correctAnswer, correctAnswers, trueFalseAnswer, dll.
-        // Hanya kirim data yang dibutuhkan siswa untuk melihat soal.
-        if (q.type === "multi_true_false") {
-          // Untuk B/S bertingkat, kita butuh teks pernyataannya saja
-          q.statements = dbQ.correct_answer?.statements?.map((st: any) => ({ text: st.text })) || [];
-        }
-        if (q.type === "matching") {
-          // Untuk menjodohkan, kita butuh teks kiri dan kanan
-          q.pairs = dbQ.correct_answer?.pairs || [];
-        }
-        if (q.type === "ordering") {
-          // Untuk mengurutkan, kita butuh item-nya (nanti diacak di browser)
-          q.items = dbQ.correct_answer?.items || [];
-        }
-        
-        return q;
-      }),
-  };
 }
