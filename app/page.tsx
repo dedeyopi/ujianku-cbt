@@ -189,7 +189,7 @@ export default function HomePage() {
         {/* Footer */}
         <div className="mt-24 text-center border-t border-slate-800 pt-8">
           <p className="text-sm font-medium text-slate-500">
-            &copy; 2025 UjianKu. Dibuat mandiri untuk pembelajaran yang lebih baik.
+            &copy; 2026 UjianKu. Dibuat mandiri by Dede Yopi untuk pembelajaran yang lebih baik.
           </p>
         </div>
       </div>
