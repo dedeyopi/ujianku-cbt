@@ -250,17 +250,18 @@ export function UjianClient() {
       <main className="min-h-screen flex items-center justify-center p-6 bg-[#0B1120] relative overflow-hidden">
         <div className="absolute top-0 left-1/2 w-[600px] h-[600px] bg-blue-600/20 rounded-full blur-[100px] -translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
         
-        <Card className="p-8 max-w-lg w-full text-center bg-slate-800/80 backdrop-blur-xl border border-slate-700 shadow-2xl relative z-10">
-          <div className="w-16 h-16 rounded-full bg-slate-900/50 border border-slate-700 flex items-center justify-center mx-auto mb-6">
-            <Lock className="w-8 h-8 text-amber-400" />
+        {/* PERBAIKAN: Menggunakan div biasa, bukan Card, agar tema gelap benar-benar diterapkan */}
+        <div className="p-8 max-w-lg w-full text-center bg-slate-800 border border-slate-700 shadow-2xl relative z-10 rounded-3xl">
+          <div className="w-20 h-20 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center mx-auto mb-6 shadow-inner">
+            <Lock className="w-10 h-10 text-amber-400" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">{exam.title}</h1>
-          <p className="text-base text-slate-400 mb-8">{exam.questions.length} soal • {Math.floor(exam.duration / 60)} menit</p>
+          <p className="text-lg font-medium text-slate-300 mb-8">{exam.questions.length} soal • {Math.floor(exam.duration / 60)} menit</p>
           
-          <div className="bg-slate-900/50 p-5 rounded-2xl text-left text-sm text-slate-300 mb-8 border border-slate-700/50">
-            <p className="font-bold text-amber-400 mb-3 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> Perhatian Sebelum Memulai:</p>
-            <ul className="list-disc pl-5 space-y-2">
-              <li>Ujian akan berjalan dalam mode <b>Layar Penuh</b>.</li>
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl text-left mb-8">
+            <p className="font-bold text-amber-400 text-lg mb-3 flex items-center gap-2"><AlertTriangle className="w-5 h-5" /> Perhatian Sebelum Memulai:</p>
+            <ul className="list-disc pl-5 space-y-2 text-base text-slate-300">
+              <li>Ujian akan berjalan dalam mode <b className="text-white">Layar Penuh</b>.</li>
               <li>Dilarang berpindah tab atau keluar dari layar ujian.</li>
               <li>Klik kanan, blok teks, dan Copy-Paste dinonaktifkan.</li>
               <li>Jawaban tersimpan secara otomatis (Auto-save).</li>
@@ -271,7 +272,7 @@ export function UjianClient() {
           <button onClick={startExam} className="w-full inline-flex items-center justify-center font-bold rounded-xl px-6 py-4 text-lg text-slate-900 bg-amber-400 hover:bg-amber-300 transition-all shadow-[0_0_20px_rgba(251,191,36,0.2)] hover:shadow-[0_0_30px_rgba(251,191,36,0.4)]">
             Saya Mengerti, Mulai Ujian <ArrowRight className="w-5 h-5 ml-2" />
           </button>
-        </Card>
+        </div>
       </main>
     );
   }
