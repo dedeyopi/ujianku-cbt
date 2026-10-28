@@ -2,7 +2,12 @@ import type { Question } from "./types";
 
 export function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
   if (jawabanSiswa === undefined || jawabanSiswa === null) return false;
-  const normalize = (s: any) => String(s).trim().toLowerCase();
+  
+  // Fungsi untuk menghapus semua tag HTML (seperti <div>, <p>, <span>) agar teksnya bersih
+  const stripHtml = (html: any) => String(html).replace(/<[^>]*>?/gm, '');
+  
+  // Fungsi normalisasi: hapus HTML, hapus spasi di ujung, ubah ke huruf kecil
+  const normalize = (s: any) => stripHtml(s).trim().toLowerCase();
 
   switch (q.type) {
     case "multiple_choice": 
