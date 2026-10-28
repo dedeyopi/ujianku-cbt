@@ -300,7 +300,7 @@ export function UjianClient() {
           </div>
         )}
 
-        {/* Header Ujian (Ganti Card menjadi div gelap) */}
+        {/* Header Ujian */}
         <div className="p-5 mb-5 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
@@ -319,15 +319,18 @@ export function UjianClient() {
           </div>
         </div>
 
-        {/* Konten Soal (Ganti Card menjadi div gelap) */}
+        {/* Konten Soal */}
         <div className="p-6 sm:p-8 mb-5 bg-slate-800 border border-slate-700 shadow-xl rounded-3xl">
           <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
             <p className="text-sm font-bold text-slate-300 uppercase tracking-wider">Soal {nomorSoal + 1} <span className="text-slate-500 font-normal">dari {exam.questions.length}</span></p>
             {savedFlash && <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fade-in-up"><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
           </div>
           
-          {/* Pertanyaan */}
-          <div className="text-xl sm:text-2xl font-medium text-white mb-8 leading-relaxed" dangerouslySetInnerHTML={{ __html: soal.question }} />
+          {/* PERTANYAAN (DIPERBAIKI: Menambahkan [&_*]:!text-white agar teks pucat dari Word menjadi putih) */}
+          <div 
+            className="text-xl sm:text-2xl font-medium text-white mb-8 leading-relaxed prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
+            dangerouslySetInnerHTML={{ __html: soal.question }} 
+          />
           
           {soal.image && <img src={soal.image} className="max-h-64 mb-8 rounded-xl border border-slate-600 shadow-md" />}
 
@@ -340,7 +343,12 @@ export function UjianClient() {
                 <button key={i} onClick={() => updateJawaban(soal.id, identifier)} className={`w-full text-left p-4 rounded-xl border-2 flex items-center gap-4 transition-all duration-200 ${isSelected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-800 hover:border-slate-500"}`}>
                   <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 transition-colors ${isSelected ? "bg-amber-400 text-slate-900" : "bg-slate-700 text-slate-300"}`}>{String.fromCharCode(65+i)}</span>
                   {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
-                  <div className={`text-lg prose prose-sm max-w-none prose-invert ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
+                  
+                  {/* OPSI JAWABAN (Dipaksa agar teksnya mengikuti warna parent, bukan hitam bawaan) */}
+                  <div 
+                    className={`text-lg prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} 
+                    dangerouslySetInnerHTML={{ __html: opt }} 
+                  />
                 </button>
               );
             })}
@@ -356,7 +364,11 @@ export function UjianClient() {
                 }} className={`w-full text-left p-4 rounded-xl border-2 flex items-center gap-4 transition-all duration-200 ${selected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-800 hover:border-slate-500"}`}>
                   <div className={`w-8 h-8 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-500"}`}>{selected && <CheckCircle2 className="w-5 h-5"/>}</div>
                   {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
-                  <div className={`text-lg prose prose-sm max-w-none prose-invert ${selected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
+                  
+                  <div 
+                    className={`text-lg prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${selected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} 
+                    dangerouslySetInnerHTML={{ __html: opt }} 
+                  />
                 </button>
               );
             })}
@@ -376,7 +388,11 @@ export function UjianClient() {
               const curr = ans || {};
               return (
                 <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border border-slate-600 bg-slate-900 rounded-xl gap-4">
-                  <div className="text-base text-slate-200 flex-1 prose prose-sm max-w-none prose-invert" dangerouslySetInnerHTML={{ __html: st.text }} />
+                  {/* PERNYATAAN (Dipaksa terang) */}
+                  <div 
+                    className="text-base text-slate-200 flex-1 prose prose-sm max-w-none prose-invert [&_*]:!text-inherit" 
+                    dangerouslySetInnerHTML={{ __html: st.text }} 
+                  />
                   <div className="flex gap-2 shrink-0">
                     <button onClick={() => updateJawaban(soal.id, {...curr, [i]: true})} className={`px-6 py-2.5 rounded-lg border-2 text-sm font-bold transition-all ${curr[i] === true ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>BENAR</button>
                     <button onClick={() => updateJawaban(soal.id, {...curr, [i]: false})} className={`px-6 py-2.5 rounded-lg border-2 text-sm font-bold transition-all ${curr[i] === false ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>SALAH</button>
@@ -391,7 +407,10 @@ export function UjianClient() {
                   const curr = ans || {};
                   return (
                     <div key={i} className="flex flex-col sm:flex-row gap-3 items-center">
-                      <div className="flex-1 w-full p-4 bg-slate-900 border border-slate-700 rounded-xl text-base text-slate-200 prose prose-sm max-w-none prose-invert" dangerouslySetInnerHTML={{ __html: p.left }} />
+                      <div 
+                        className="flex-1 w-full p-4 bg-slate-900 border border-slate-700 rounded-xl text-base text-slate-200 prose prose-sm max-w-none prose-invert [&_*]:!text-inherit" 
+                        dangerouslySetInnerHTML={{ __html: p.left }} 
+                      />
                       <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-4 rounded-xl border-2 border-slate-600 bg-slate-800 text-base text-white focus:border-amber-400 focus:outline-none">
                         <option value="" disabled>-- Pilih Pasangan --</option>
                         {soal.pairs?.map(pr => <option key={pr.right} value={pr.right}>{pr.right.replace(/<[^>]*>?/gm, '')}</option>)}
@@ -407,7 +426,10 @@ export function UjianClient() {
                 {(ans && Array.isArray(ans) ? ans : soal.items || []).map((item, i, arr) => (
                   <div key={i} className="flex gap-3 items-center p-3 bg-slate-800 border border-slate-600 rounded-xl">
                     <span className="w-8 text-center font-bold text-amber-400 text-lg">{i+1}</span>
-                    <div className="flex-1 text-base text-slate-200 prose prose-sm max-w-none prose-invert" dangerouslySetInnerHTML={{ __html: item }} />
+                    <div 
+                      className="flex-1 text-base text-slate-200 prose prose-sm max-w-none prose-invert [&_*]:!text-inherit" 
+                      dangerouslySetInnerHTML={{ __html: item }} 
+                    />
                     <div className="flex flex-col gap-1">
                       <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className="p-1.5 bg-slate-700 rounded text-slate-300 hover:bg-slate-600 disabled:opacity-30">▲</button>
                       <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className="p-1.5 bg-slate-700 rounded text-slate-300 hover:bg-slate-600 disabled:opacity-30">▼</button>
@@ -430,7 +452,7 @@ export function UjianClient() {
           </div>
         </div>
 
-        {/* Navigasi Soal (Ganti Card menjadi div gelap) */}
+        {/* Navigasi Soal */}
         <div className="p-5 mb-5 bg-slate-800 border border-slate-700 shadow-lg rounded-2xl">
           <p className="text-sm font-semibold text-slate-400 mb-3">Navigasi Soal:</p>
           <div className="flex flex-wrap gap-2">
