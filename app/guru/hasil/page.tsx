@@ -2,43 +2,17 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Trophy, FileText, AlertTriangle, Trash2, Eye, X, RefreshCw, Save, BarChart2 } from "lucide-react";
+import { ArrowLeft, Download, Trophy, FileText, AlertTriangle, Trash2, Eye, X, RefreshCw, Save, BarChart2, RotateCw } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { isLoggedIn } from "../../lib/auth";
 import { fetchExams, fetchResultsByExam, updateResultGrades } from "../../lib/db";
 import { exportResultsToExcel, exportQuestionAnalysisToExcel } from "../../lib/excel";
 import { supabase } from "../../lib/supabase";
+import { isJawabanBenar } from "../../lib/grading"; // Import dari file baru
 import type { Exam, ExamResult, Question } from "../../lib/types";
 
-// Import Komponen Recharts
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-
-function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
-  if (jawabanSiswa === undefined || jawabanSiswa === null) return false;
-  const normalize = (s: string) => String(s).trim().toLowerCase();
-  switch (q.type) {
-    case "multiple_choice": return jawabanSiswa === q.correctAnswer;
-    case "complex_mc":
-      if (!Array.isArray(jawabanSiswa) || !q.correctAnswers) return false;
-      if (jawabanSiswa.length !== q.correctAnswers.length) return false;
-      return jawabanSiswa.every(ans => q.correctAnswers!.includes(ans));
-    case "true_false": return jawabanSiswa === q.trueFalseAnswer;
-    case "multi_true_false":
-      if (!q.statements) return false;
-      return q.statements.every((st, i) => jawabanSiswa[i] === st.isTrue);
-    case "matching":
-      if (!q.pairs || !jawabanSiswa) return false;
-      return q.pairs.every(p => jawabanSiswa[p.left] === p.right);
-    case "ordering":
-      if (!q.items || !Array.isArray(jawabanSiswa)) return false;
-      return q.items.every((item, i) => jawabanSiswa[i] === item);
-    case "short_answer":
-      const accepted = q.acceptedAnswers || [];
-      return accepted.some((a) => normalize(a) === normalize(jawabanSiswa));
-    default: return false;
-  }
-}
 
 export default function HasilUjianPage() {
   const router = useRouter();
@@ -48,6 +22,7 @@ export default function HasilUjianPage() {
   const [results, setResults] = useState<ExamResult[]>([]);
   const [isFetchingResults, setIsFetchingResults] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const [selectedResult, setSelectedResult] = useState<ExamResult | null>(null);
   const [activeTab, setActiveTab] = useState<"siswa" | "soal" | "grafik">("siswa");
@@ -96,6 +71,31 @@ export default function HasilUjianPage() {
     setIsRefreshing(false);
   }
 
+  async function handleSyncGrades() {
+    if (!selectedExamId) return;
+    if (!confirm("Sinkronisasi nilai akan menghitung ulang nilai semua siswa berdasarkan kunci jawaban terbaru. Lanjutkan?")) return;
+    
+    setIsSyncing(true);
+    try {
+      const res = await fetch("/api/sync-grades", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ examId: selectedExamId })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        alert(`Sinkronisasi berhasil! ${data.updatedCount} nilai siswa diperbarui.`);
+        await handleRefresh(); // Tarik data terbaru
+      } else {
+        alert("Gagal sinkronisasi: " + data.error);
+      }
+    } catch (err) {
+      alert("Terjadi kesalahan saat menghubungi server.");
+    }
+    setIsSyncing(false);
+  }
+
   async function handleDeleteResult(id: string, name: string) {
     if (!confirm(`Hapus hasil ujian ${name}? Siswa ini akan bisa mengerjakan ulang.`)) return;
     const { error } = await supabase.from("results").delete().eq("id", id);
@@ -117,7 +117,7 @@ export default function HasilUjianPage() {
     if (!exam) return;
     
     if (activeTab === "siswa") {
-      if (filteredResults.length === 0) return alert("Belum ada data untuk diekspor.");
+      if (filteredResults.length === 0) return alert("Belum ada data.");
       exportResultsToExcel(filteredResults.map(r => ({ ...r, examTitle: exam.title })), exam.title);
     } else {
       const qAnalysis = getQuestionAnalysis();
@@ -185,14 +185,8 @@ export default function HasilUjianPage() {
   const rataRata = filteredResults.length > 0 ? Math.round(filteredResults.reduce((sum, r) => sum + r.score, 0) / filteredResults.length) : 0;
   const questionAnalysis = getQuestionAnalysis();
 
-  // --- PERSIAPAN DATA UNTUK GRAFIK ---
-  // 1. Data Distribusi Nilai
   const scoreRanges = [
-    { name: "0-59", count: 0 },
-    { name: "60-69", count: 0 },
-    { name: "70-79", count: 0 },
-    { name: "80-89", count: 0 },
-    { name: "90-100", count: 0 },
+    { name: "0-59", count: 0 }, { name: "60-69", count: 0 }, { name: "70-79", count: 0 }, { name: "80-89", count: 0 }, { name: "90-100", count: 0 },
   ];
   filteredResults.forEach(r => {
     if (r.score < 60) scoreRanges[0].count++;
@@ -202,19 +196,17 @@ export default function HasilUjianPage() {
     else scoreRanges[4].count++;
   });
 
-  // 2. Data Tingkat Kesukaran
-  let mudah = 0, sedang = 0, sulit = 0, manual = 0;
+  let mudah = 0, sedang = 0, sulit = 0;
   questionAnalysis.forEach(qa => {
     if (qa.kategori === "Mudah") mudah++;
     else if (qa.kategori === "Sedang") sedang++;
     else if (qa.kategori === "Sulit") sulit++;
-    else manual++;
   });
   const difficultyData = [
-    { name: "Mudah", value: mudah, color: "#10b981" }, // Emerald
-    { name: "Sedang", value: sedang, color: "#f59e0b" }, // Amber
-    { name: "Sulit", value: sulit, color: "#ef4444" }, // Red
-  ].filter(d => d.value > 0); // Hanya tampilkan yang ada datanya
+    { name: "Mudah", value: mudah, color: "#10b981" },
+    { name: "Sedang", value: sedang, color: "#f59e0b" },
+    { name: "Sulit", value: sulit, color: "#ef4444" },
+  ].filter(d => d.value > 0);
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
@@ -248,13 +240,18 @@ export default function HasilUjianPage() {
                   {availableClasses.map(c => <option key={c} value={c}>{c === "Semua" ? "Semua Kelas" : `Kelas ${c}`}</option>)}
                 </select>
 
+                <button onClick={handleSyncGrades} disabled={isSyncing || isFetchingResults} className="inline-flex items-center justify-center font-semibold rounded-xl px-4 py-2.5 text-sm bg-amber-100 border border-amber-200 text-amber-700 hover:bg-amber-200 shadow-sm disabled:opacity-50 transition" title="Hitung ulang nilai berdasarkan kunci terbaru">
+                  <RotateCw className={`w-4 h-4 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? "Sinkronisasi..." : "Sinkron Nilai"}
+                </button>
+
                 <button onClick={handleRefresh} disabled={isRefreshing} className="inline-flex items-center justify-center font-semibold rounded-xl px-4 py-2.5 text-sm bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-50 transition">
                   <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />{isRefreshing ? "Memuat..." : "Refresh"}
                 </button>
                 
                 {activeTab !== "grafik" && (
                   <button onClick={handleExport} disabled={(activeTab === 'siswa' && filteredResults.length === 0) || (activeTab === 'soal' && questionAnalysis.length === 0) || isFetchingResults} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50">
-                    <Download className="w-4 h-4 mr-1.5" />Export {activeTab === "siswa" ? "Nilai" : "Analisis"}
+                    <Download className="w-4 h-4 mr-1.5" />Export
                   </button>
                 )}
               </div>
@@ -284,6 +281,7 @@ export default function HasilUjianPage() {
                       <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-medium text-xs uppercase tracking-wider">
                           <tr>
+                            <th className="px-4 py-3 w-12 text-center">No</th>
                             <th className="px-4 py-3">Nama Siswa</th>
                             <th className="px-4 py-3">Kelas</th>
                             <th className="px-4 py-3 text-center">Nilai</th>
@@ -293,8 +291,9 @@ export default function HasilUjianPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {filteredResults.map((r) => (
+                          {filteredResults.map((r, index) => (
                             <tr key={r.id} className="hover:bg-slate-50/50 transition">
+                              <td className="px-4 py-3 text-center text-slate-500 font-medium">{index + 1}</td>
                               <td className="px-4 py-3 font-medium text-slate-900">{r.studentName}</td>
                               <td className="px-4 py-3 text-slate-600">{r.className}</td>
                               <td className="px-4 py-3 text-center">
@@ -346,23 +345,16 @@ export default function HasilUjianPage() {
                 ))}
               </div>
             ) : (
-              // TAB 3: GRAFIK VISUALISASI
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card className="p-6">
-                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <BarChart2 className="w-5 h-5 text-emerald-600" />
-                    Distribusi Nilai Siswa
-                  </h3>
+                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><BarChart2 className="w-5 h-5 text-emerald-600" /> Distribusi Nilai</h3>
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={scoreRanges} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                         <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                         <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                        <Tooltip 
-                          cursor={{ fill: '#f1f5f9' }}
-                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        />
+                        <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                         <Bar dataKey="count" name="Jumlah Siswa" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -370,29 +362,14 @@ export default function HasilUjianPage() {
                 </Card>
 
                 <Card className="p-6">
-                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <BarChart2 className="w-5 h-5 text-amber-600" />
-                    Proporsi Tingkat Kesukaran
-                  </h3>
+                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><BarChart2 className="w-5 h-5 text-amber-600" /> Tingkat Kesukaran</h3>
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie
-                          data={difficultyData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {difficultyData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
+                        <Pie data={difficultyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                          {difficultyData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                         </Pie>
-                        <Tooltip 
-                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        />
+                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                         <Legend verticalAlign="bottom" height={36} iconType="circle" />
                       </PieChart>
                     </ResponsiveContainer>
