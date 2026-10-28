@@ -9,10 +9,8 @@ import {
   WifiOff,
   CheckCircle2,
   Lock,
-  Laptop,
-  BookOpen,
-  Pencil,
-  FileText
+  Clock,
+  Monitor
 } from "lucide-react";
 
 export default function HomePage() {
@@ -89,7 +87,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* --- KOLOM KANAN: MOCKUP VISUAL --- */}
+          {/* --- KOLOM KANAN: MOCKUP VISUAL REALISTIS --- */}
           <div className="lg:col-span-6 relative animate-fade-in-up flex justify-center" style={{ animationDelay: "0.2s" }}>
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-blue-500/20 rounded-full blur-3xl"></div>
@@ -97,81 +95,91 @@ export default function HomePage() {
             <div className="relative w-full max-w-lg mt-8 lg:mt-0">
               
               {/* Kartu Nilai (Floating) */}
-              <div className="absolute -top-12 -right-6 lg:-right-10 bg-slate-800/80 backdrop-blur-md border border-slate-700 p-4 rounded-2xl shadow-2xl animate-float z-20 w-44">
+              <div className="absolute -top-10 -right-4 lg:-right-12 bg-slate-800/90 backdrop-blur-xl border border-slate-600 p-5 rounded-2xl shadow-2xl animate-float z-30 w-44">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nilai Akhir</span>
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 </div>
-                <div className="text-3xl font-black text-white">98<span className="text-sm text-slate-500 font-normal">/100</span></div>
-                <div className="w-full bg-slate-700 h-1.5 rounded-full mt-2">
-                  <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: '98%' }}></div>
+                <div className="text-4xl font-black text-white">98<span className="text-sm text-slate-500 font-normal">/100</span></div>
+                <div className="w-full bg-slate-700 h-2 rounded-full mt-3">
+                  <div className="bg-emerald-400 h-2 rounded-full shadow-[0_0_10px_rgba(52,211,153,0.5)]" style={{ width: '98%' }}></div>
                 </div>
               </div>
 
               {/* Ikon Perisai (Floating) */}
-              <div className="absolute bottom-16 -left-6 lg:-left-10 bg-slate-800/80 backdrop-blur-md border border-slate-700 p-4 rounded-2xl shadow-2xl animate-float-slow z-20">
-                <ShieldCheck className="w-8 h-8 text-amber-400" />
+              <div className="absolute top-1/2 -left-6 lg:-left-12 bg-slate-800/90 backdrop-blur-xl border border-slate-600 p-4 rounded-2xl shadow-2xl animate-float-slow z-30">
+                <ShieldCheck className="w-10 h-10 text-amber-400" />
+                <div className="absolute -bottom-2 -right-2 w-4 h-4 bg-emerald-500 rounded-full border-2 border-slate-800"></div>
               </div>
 
-              {/* Elemen Dekoratif (Kubus) */}
-              <div className="absolute -bottom-6 right-12 w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl transform rotate-12 shadow-lg animate-float z-0 opacity-50"></div>
-
-              {/* KARTU UI UTAMA (MOCKUP) */}
-              <div className="bg-slate-800/90 backdrop-blur-xl border border-slate-700 rounded-3xl shadow-2xl overflow-hidden relative z-10">
+              {/* --- UI MOCKUP UTAMA (JENDELA APLIKASI) --- */}
+              <div className="bg-[#131C2F] border border-slate-700 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden relative z-20 flex flex-col h-[400px]">
                 
-                {/* Header Mockup */}
-                <div className="bg-slate-900/50 px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">Ujian Matematika</div>
-                      <div className="text-[10px] text-slate-400">Lembar Jawaban Siswa</div>
-                    </div>
+                {/* Top Bar Window */}
+                <div className="bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-700/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
+                    <div className="w-3 h-3 rounded-full bg-amber-500/80"></div>
+                    <div className="w-3 h-3 rounded-full bg-emerald-500/80"></div>
                   </div>
-                  <div className="px-3 py-1 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-xs font-bold font-mono">
-                    09:45
+                  <div className="flex items-center gap-2 text-xs font-mono text-slate-400 bg-slate-800 px-3 py-1 rounded-md border border-slate-700">
+                    <Lock className="w-3 h-3 text-emerald-400" /> ujianku-cbt.vercel.app
                   </div>
+                  <div className="w-12"></div> {/* Spacer */}
                 </div>
 
-                {/* Body Mockup (ILUSTRASI BARU) */}
-                <div className="p-8 pb-12 flex items-center justify-center relative">
-                  {/* Latar belakang ilustrasi */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent"></div>
+                {/* Konten Aplikasi */}
+                <div className="flex flex-1 overflow-hidden">
                   
-                  {/* Komposisi Ilustrasi */}
-                  <div className="relative flex items-end justify-center gap-6 w-full max-w-xs">
-                    {/* Buku */}
-                    <div className="w-16 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg shadow-lg transform -rotate-12 relative z-10 flex flex-col items-center pt-2 animate-float-slow">
-                      <div className="w-10 h-1 bg-white/40 rounded mb-1"></div>
-                      <div className="w-8 h-1 bg-white/40 rounded mb-1"></div>
-                      <div className="w-10 h-1 bg-white/40 rounded"></div>
+                  {/* Sidebar Mini (Navigasi Soal) */}
+                  <div className="w-16 bg-slate-900/50 border-r border-slate-800 flex flex-col items-center py-4 gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center mb-2">
+                      <Monitor className="w-4 h-4 text-white" />
                     </div>
-                    
-                    {/* Laptop (Pusat) */}
-                    <div className="relative z-20 transform scale-125">
-                      <Laptop className="w-24 h-24 text-blue-400" strokeWidth={1.5} />
-                      <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full"></div>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <div key={n} className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${n === 3 ? 'bg-amber-400 text-slate-900' : n < 3 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                        {n}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Area Soal Utama */}
+                  <div className="flex-1 p-6 flex flex-col">
+                    <div className="flex justify-between items-center mb-6">
+                      <div className="text-sm font-bold text-slate-300">Soal 3 dari 20</div>
+                      <div className="flex items-center gap-1.5 text-amber-400 font-mono text-sm bg-amber-400/10 px-2.5 py-1 rounded-md border border-amber-400/20">
+                        <Clock className="w-3.5 h-3.5" /> 45:00
+                      </div>
                     </div>
-                    
-                    {/* Pensil */}
-                    <div className="w-8 h-24 bg-gradient-to-b from-amber-300 to-amber-500 rounded-t-md rounded-b-sm shadow-lg transform rotate-12 relative z-10 animate-float flex flex-col items-center justify-end pb-2">
-                      <div className="w-8 h-4 bg-slate-200 rounded-t-md absolute top-0"></div>
-                      <div className="w-8 h-4 bg-amber-600/50 absolute top-2"></div>
+
+                    <div className="text-slate-200 text-sm font-medium leading-relaxed mb-6">
+                      Hitunglah besar tekanan hidrostatis yang dialami seekor ikan jika diketahui massa jenis air 1000 kg/m³ dan percepatan gravitasi 10 m/s² pada kedalaman 5 meter!
+                    </div>
+
+                    {/* Pilihan Jawaban */}
+                    <div className="space-y-2 mt-auto">
+                      {['A', 'B', 'C', 'D'].map((opt, i) => (
+                        <div key={opt} className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${i === 1 ? 'border-amber-400 bg-amber-400/10' : 'border-slate-700 bg-slate-800/30'}`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i === 1 ? 'bg-amber-400 text-slate-900' : 'bg-slate-700 text-slate-400'}`}>
+                            {opt}
+                          </div>
+                          <div className={`h-2 rounded ${i === 1 ? 'bg-amber-400/60 w-32' : 'bg-slate-600 w-24'}`}></div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
 
-                {/* Footer Mockup */}
-                <div className="bg-slate-900/50 px-6 py-4 border-t border-slate-700/50 flex justify-between items-center">
-                  <div className="text-xs text-slate-500 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> Auto-saved baru saja
+                {/* Footer Aplikasi */}
+                <div className="bg-slate-900/80 px-6 py-3 border-t border-slate-800 flex justify-between items-center">
+                  <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Tersimpan otomatis
                   </div>
-                  <div className="px-4 py-2 bg-amber-500 hover:bg-amber-400 transition-colors text-slate-900 rounded-lg text-xs font-bold">
+                  <div className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold cursor-pointer transition-colors">
                     Selanjutnya
                   </div>
                 </div>
+
               </div>
 
             </div>
