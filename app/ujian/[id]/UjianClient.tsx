@@ -279,7 +279,7 @@ export function UjianClient() {
   const ans = jawaban[soal.id];
 
   return (
-    <div className="min-h-screen bg-[#0B1120] p-4 sm:p-6 font-sans" style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }}>
+    <div className="h-screen w-full bg-[#0B1120] p-4 sm:p-6 font-sans flex flex-col overflow-hidden" style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }}>
       
       {/* Modal Peringatan Pelanggaran */}
       {showWarning && (
@@ -299,14 +299,14 @@ export function UjianClient() {
         </div>
       )}
 
-      {/* LAYOUT UTAMA: Split Screen untuk Desktop */}
-      <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6 items-start">
+      {/* LAYOUT UTAMA: Split Screen Full Height */}
+      <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
         
-        {/* SIDEBAR KIRI (Hanya tampil di Desktop) */}
-        <aside className="hidden lg:flex flex-col w-80 shrink-0 sticky top-6 gap-4">
+        {/* SIDEBAR KIRI (Desktop) */}
+        <aside className="hidden lg:flex flex-col w-80 shrink-0 h-full gap-4">
           
           {/* Info Peserta & Timer */}
-          <div className="bg-slate-800 border border-slate-700 shadow-lg rounded-2xl p-5">
+          <div className="bg-slate-800 border border-slate-700 shadow-lg rounded-2xl p-5 shrink-0">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0">
                 <span className="font-black text-amber-400 text-base">{nama.charAt(0)}</span>
@@ -324,14 +324,14 @@ export function UjianClient() {
             </div>
           </div>
 
-          {/* Navigasi Soal */}
-          <div className="bg-slate-800 border border-slate-700 shadow-lg rounded-2xl p-5">
-            <div className="flex justify-between items-center mb-4">
+          {/* Navigasi Soal & Tombol Selesai (Memastikan tinggi penuh) */}
+          <div className="bg-slate-800 border border-slate-700 shadow-lg rounded-2xl p-5 flex-1 flex flex-col">
+            <div className="flex justify-between items-center mb-4 shrink-0">
               <p className="text-sm font-semibold text-slate-300">Navigasi Soal</p>
               <p className="text-xs text-slate-500">{exam.questions.length} Butir</p>
             </div>
             
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-5 gap-2 overflow-y-auto pr-1 flex-1 content-start">
               {exam.questions.map((q, i) => {
                 const answered = jawaban[q.id] !== undefined && (Array.isArray(jawaban[q.id]) ? jawaban[q.id].length > 0 : jawaban[q.id] !== "");
                 return (
@@ -340,7 +340,8 @@ export function UjianClient() {
               })}
             </div>
             
-            <div className="mt-6 pt-4 border-t border-slate-700/50">
+            {/* Tombol Selesai di Dasar Sidebar */}
+            <div className="mt-6 pt-4 border-t border-slate-700/50 shrink-0">
                <button onClick={() => submitExam(false)} className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(52,211,153,0.2)] flex items-center justify-center gap-2">
                   <CheckCircle2 className="w-4 h-4"/> Selesai & Kirim
                </button>
@@ -348,11 +349,11 @@ export function UjianClient() {
           </div>
         </aside>
 
-        {/* AREA SOAL (Kanan) */}
-        <main className="flex-1 w-full">
+        {/* AREA SOAL (Kanan) - Memanjang Penuh */}
+        <main className="flex-1 flex flex-col h-full overflow-hidden">
           
-          {/* Header Mobile (Hanya tampil di HP) */}
-          <div className="lg:hidden p-4 mb-4 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl">
+          {/* Header Mobile */}
+          <div className="lg:hidden p-4 mb-4 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
                 <span className="font-black text-amber-400 text-base">{nama.charAt(0)}</span>
@@ -369,29 +370,30 @@ export function UjianClient() {
             </div>
           </div>
 
-          <div className="p-6 sm:p-8 mb-5 bg-slate-800 border border-slate-700 shadow-xl rounded-3xl">
-            <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
-              <p className="text-sm font-bold text-slate-300 uppercase tracking-wider">Soal {nomorSoal + 1} <span className="text-slate-500 font-normal">dari {exam.questions.length}</span></p>
+          {/* Kotak Soal (Flex-1 agar memanjang mengisi ruang kosong) */}
+          <div className="flex-1 bg-slate-800 border border-slate-700 shadow-xl rounded-3xl p-6 sm:p-10 flex flex-col overflow-y-auto mb-4">
+            <div className="flex justify-between items-center mb-8 border-b border-slate-700 pb-4 shrink-0">
+              <p className="text-sm sm:text-base font-bold text-slate-300 uppercase tracking-wider">Soal {nomorSoal + 1} <span className="text-slate-500 font-normal">dari {exam.questions.length}</span></p>
               {savedFlash && <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fade-in-up"><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
             </div>
             
             <div 
-              className="text-lg sm:text-xl font-medium text-white mb-8 leading-relaxed prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
+              className="text-xl sm:text-2xl font-medium text-white mb-10 leading-relaxed prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent shrink-0" 
               dangerouslySetInnerHTML={{ __html: soal.question }} 
             />
             
-            {soal.image && <img src={soal.image} className="max-h-64 mb-8 rounded-xl border border-slate-600 shadow-md" />}
+            {soal.image && <img src={soal.image} className="max-h-64 mb-10 rounded-xl border border-slate-600 shadow-md shrink-0 object-contain self-start" />}
 
-            <div className="space-y-4">
+            <div className="space-y-4 shrink-0">
               {soal.type === "multiple_choice" && soal.options?.map((opt, i) => {
                 const identifier = opt || `Opsi ${i+1}`;
                 const img = soal.optionImages?.[i];
                 const isSelected = ans === identifier;
                 return (
-                  <button key={i} onClick={() => updateJawaban(soal.id, identifier)} className={`w-full text-left p-4 rounded-xl border-2 flex items-center gap-4 transition-all duration-200 ${isSelected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-800 hover:border-slate-500"}`}>
-                    <span className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-base shrink-0 transition-colors ${isSelected ? "bg-amber-400 text-slate-900" : "bg-slate-700 text-slate-300"}`}>{String.fromCharCode(65+i)}</span>
+                  <button key={i} onClick={() => updateJawaban(soal.id, identifier)} className={`w-full text-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-200 ${isSelected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-900/50 hover:border-slate-500"}`}>
+                    <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 transition-colors ${isSelected ? "bg-amber-400 text-slate-900" : "bg-slate-700 text-slate-300"}`}>{String.fromCharCode(65+i)}</span>
                     {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
-                    <div className={`text-base sm:text-lg prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
+                    <div className={`text-lg sm:text-xl prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
                   </button>
                 );
               })}
@@ -404,10 +406,10 @@ export function UjianClient() {
                   <button key={i} onClick={() => {
                     const curr = Array.isArray(ans) ? ans : [];
                     updateJawaban(soal.id, selected ? curr.filter(a => a !== identifier) : [...curr, identifier]);
-                  }} className={`w-full text-left p-4 rounded-xl border-2 flex items-center gap-4 transition-all duration-200 ${selected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-800 hover:border-slate-500"}`}>
-                    <div className={`w-7 h-7 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-500"}`}>{selected && <CheckCircle2 className="w-4 h-4"/>}</div>
+                  }} className={`w-full text-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-200 ${selected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-900/50 hover:border-slate-500"}`}>
+                    <div className={`w-8 h-8 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-500"}`}>{selected && <CheckCircle2 className="w-5 h-5"/>}</div>
                     {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
-                    <div className={`text-base sm:text-lg prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${selected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
+                    <div className={`text-lg sm:text-xl prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${selected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
                   </button>
                 );
               })}
@@ -417,7 +419,7 @@ export function UjianClient() {
                   {[true, false].map(val => {
                     const isSelected = ans === val;
                     return (
-                      <button key={String(val)} onClick={() => updateJawaban(soal.id, val)} className={`py-5 rounded-xl border-2 font-bold text-base sm:text-lg transition-all duration-200 ${isSelected ? "border-amber-400 bg-amber-400/10 text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-800 text-slate-300 hover:border-slate-500"}`}>{val ? "BENAR" : "SALAH"}</button>
+                      <button key={String(val)} onClick={() => updateJawaban(soal.id, val)} className={`py-6 rounded-2xl border-2 font-bold text-lg transition-all duration-200 ${isSelected ? "border-amber-400 bg-amber-400/10 text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-900/50 text-slate-300 hover:border-slate-500"}`}>{val ? "BENAR" : "SALAH"}</button>
                     );
                   })}
                 </div>
@@ -426,11 +428,11 @@ export function UjianClient() {
               {soal.type === "multi_true_false" && soal.statements?.map((st, i) => {
                 const curr = ans || {};
                 return (
-                  <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border border-slate-600 bg-slate-900 rounded-xl gap-4">
-                    <div className="text-sm sm:text-base text-slate-200 flex-1 prose prose-sm max-w-none prose-invert [&_*]:!text-inherit" dangerouslySetInnerHTML={{ __html: st.text }} />
+                  <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 border-2 border-slate-600 bg-slate-900/50 rounded-2xl gap-4">
+                    <div className="text-base sm:text-lg text-slate-200 flex-1 prose prose-sm max-w-none prose-invert [&_*]:!text-inherit" dangerouslySetInnerHTML={{ __html: st.text }} />
                     <div className="flex gap-2 shrink-0">
-                      <button onClick={() => updateJawaban(soal.id, {...curr, [i]: true})} className={`px-5 py-2 rounded-lg border-2 text-xs font-bold transition-all ${curr[i] === true ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>BENAR</button>
-                      <button onClick={() => updateJawaban(soal.id, {...curr, [i]: false})} className={`px-5 py-2 rounded-lg border-2 text-xs font-bold transition-all ${curr[i] === false ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>SALAH</button>
+                      <button onClick={() => updateJawaban(soal.id, {...curr, [i]: true})} className={`px-6 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${curr[i] === true ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>BENAR</button>
+                      <button onClick={() => updateJawaban(soal.id, {...curr, [i]: false})} className={`px-6 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${curr[i] === false ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>SALAH</button>
                     </div>
                   </div>
                 );
@@ -441,9 +443,9 @@ export function UjianClient() {
                   {soal.pairs?.map((p, i) => {
                     const curr = ans || {};
                     return (
-                      <div key={i} className="flex flex-col sm:flex-row gap-3 items-center">
-                        <div className="flex-1 w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-200 prose prose-sm max-w-none prose-invert [&_*]:!text-inherit" dangerouslySetInnerHTML={{ __html: p.left }} />
-                        <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-3 rounded-xl border-2 border-slate-600 bg-slate-800 text-sm text-white focus:border-amber-400 focus:outline-none">
+                      <div key={i} className="flex flex-col sm:flex-row gap-4 items-center">
+                        <div className="flex-1 w-full p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl text-base text-slate-200 prose prose-sm max-w-none prose-invert [&_*]:!text-inherit" dangerouslySetInnerHTML={{ __html: p.left }} />
+                        <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-4 rounded-xl border-2 border-slate-600 bg-slate-800 text-base text-white focus:border-amber-400 focus:outline-none">
                           <option value="" disabled>-- Pilih Pasangan --</option>
                           {soal.pairs?.map(pr => <option key={pr.right} value={pr.right}>{pr.right.replace(/<[^>]*>?/gm, '')}</option>)}
                         </select>
@@ -454,14 +456,14 @@ export function UjianClient() {
               )}
 
               {soal.type === "ordering" && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {(ans && Array.isArray(ans) ? ans : soal.items || []).map((item, i, arr) => (
-                    <div key={i} className="flex gap-3 items-center p-3 bg-slate-800 border border-slate-600 rounded-xl">
-                      <span className="w-7 text-center font-bold text-amber-400 text-base">{i+1}</span>
-                      <div className="flex-1 text-sm text-slate-200 prose prose-sm max-w-none prose-invert [&_*]:!text-inherit" dangerouslySetInnerHTML={{ __html: item }} />
+                    <div key={i} className="flex gap-4 items-center p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl">
+                      <span className="w-8 text-center font-bold text-amber-400 text-lg">{i+1}</span>
+                      <div className="flex-1 text-base text-slate-200 prose prose-sm max-w-none prose-invert [&_*]:!text-inherit" dangerouslySetInnerHTML={{ __html: item }} />
                       <div className="flex flex-col gap-1">
-                        <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className="p-1.5 bg-slate-700 rounded text-slate-300 hover:bg-slate-600 disabled:opacity-30">▲</button>
-                        <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className="p-1.5 bg-slate-700 rounded text-slate-300 hover:bg-slate-600 disabled:opacity-30">▼</button>
+                        <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className="p-2 bg-slate-700 rounded-lg text-slate-300 hover:bg-slate-600 disabled:opacity-30">▲</button>
+                        <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className="p-2 bg-slate-700 rounded-lg text-slate-300 hover:bg-slate-600 disabled:opacity-30">▼</button>
                       </div>
                     </div>
                   ))}
@@ -469,24 +471,24 @@ export function UjianClient() {
               )}
 
               {soal.type === "short_answer" && (
-                <input type="text" value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban Anda..." className="w-full p-4 border-2 border-slate-600 bg-slate-900 rounded-xl text-lg text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none transition" />
+                <input type="text" value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban Anda..." className="w-full p-5 border-2 border-slate-600 bg-slate-900/50 rounded-2xl text-xl text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none transition" />
               )}
 
               {soal.type === "essay" && (
                 <div>
-                  <textarea rows={8} value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban panjang Anda di sini..." className="w-full p-4 border-2 border-slate-600 bg-slate-900 rounded-xl text-base text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none resize-none transition" />
-                  <p className="text-xs font-medium text-amber-500 mt-2">Jawaban esai akan dinilai manual oleh guru.</p>
+                  <textarea rows={10} value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban panjang Anda di sini..." className="w-full p-5 border-2 border-slate-600 bg-slate-900/50 rounded-2xl text-lg text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none resize-none transition" />
+                  <p className="text-sm font-medium text-amber-500 mt-2">Jawaban esai akan dinilai manual oleh guru.</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Tombol Navigasi Bawah */}
-          <div className="flex justify-between gap-4">
+          {/* Tombol Navigasi Bawah (Selalu di Dasar) */}
+          <div className="flex justify-between gap-4 shrink-0">
             <button 
               onClick={() => setNomorSoal(n => Math.max(0, n-1))} 
               disabled={nomorSoal===0} 
-              className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm text-slate-300 bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:opacity-30 transition flex items-center justify-center gap-2"
+              className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-300 bg-slate-800 border-2 border-slate-700 hover:bg-slate-700 disabled:opacity-30 transition flex items-center justify-center gap-2"
             >
               <ChevronLeft className="w-5 h-5"/> Sebelumnya
             </button>
@@ -494,14 +496,14 @@ export function UjianClient() {
             {nomorSoal === exam.questions.length - 1 ? (
               <button 
                 onClick={() => submitExam(false)} 
-                className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.2)] transition flex items-center justify-center gap-2 lg:hidden"
+                className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.2)] transition flex items-center justify-center gap-2 lg:hidden"
               >
                 <CheckCircle2 className="w-5 h-5"/> Selesai & Kirim
               </button>
             ) : (
               <button 
                 onClick={() => setNomorSoal(n => Math.min(exam.questions.length-1, n+1))} 
-                className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm text-slate-900 bg-amber-400 hover:bg-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.2)] transition flex items-center justify-center gap-2"
+                className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-amber-400 hover:bg-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.2)] transition flex items-center justify-center gap-2"
               >
                 Selanjutnya <ChevronRight className="w-5 h-5"/>
               </button>
