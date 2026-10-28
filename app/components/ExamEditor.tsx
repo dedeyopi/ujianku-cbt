@@ -13,7 +13,7 @@ import { Card } from "./Card";
 import { Input } from "./Input";
 import { ImageUploader } from "./ImageUploader";
 import { TextEditor } from "./TextEditor";
-import { fetchExamById, saveExam, fetchBankQuestions, saveQuestionToBank } from "../lib/db";
+import { fetchExamById, saveExam, fetchBankQuestions, saveQuestionToBank, bulkSaveToBank } from "../lib/db";
 import { isLoggedIn } from "../lib/auth";
 import { downloadTemplateImport, parseExcelToQuestions } from "../lib/excel";
 import type { Exam, Question, QuestionType } from "../lib/types";
@@ -74,6 +74,9 @@ export function ExamEditor({ examId }: Props) {
   const [bankModalOpen, setBankModalOpen] = useState(false);
   const [bankQuestions, setBankQuestions] = useState<Question[]>([]);
   const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
+  
+  // State Seleksi Massal (Bulk)
+  const [selectedQs, setSelectedQs] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadData() {
@@ -111,9 +114,7 @@ export function ExamEditor({ examId }: Props) {
   function generateToken() {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let result = "";
-    for (let i = 0; i < 6; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
+    for (let i = 0; i < 6; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
     updateExam({ token: result });
   }
 
@@ -139,19 +140,51 @@ export function ExamEditor({ examId }: Props) {
     setEditingQuestion(null); setIsNewQuestion(false); setShowOptImage({}); 
   }
 
-  async function handleSaveToBank() {
+  // --- SIMPAN KE BANK SOAL ---
+  async function handleSaveToBankSingle() {
     if (!editingQuestion || !exam) return;
-    const subject = prompt("Simpan ke Bank Soal.\nMasukkan Mata Pelajaran (untuk kategori):", exam.subject || "Umum");
-    if (subject === null) return; // Batal
-    
-    const success = await saveQuestionToBank(editingQuestion, subject);
+    const subject = prompt("Simpan ke Bank Soal.\nMasukkan Mata Pelajaran:", exam.subject || "Umum");
+    if (subject === null) return; 
+    const topic = prompt("Masukkan Bab / Topik (misal: Tekanan Zat):", "Umum");
+    if (topic === null) return;
+
+    const success = await saveQuestionToBank(editingQuestion, subject, topic);
     if (success) alert("Soal berhasil disimpan ke Bank Soal!");
     else alert("Gagal menyimpan ke Bank Soal.");
+  }
+
+  async function handleBulkSaveToBank() {
+    if (!exam || selectedQs.length === 0) return;
+    const subject = prompt(`Simpan ${selectedQs.length} soal ke Bank Soal.\nMasukkan Mata Pelajaran:`, exam.subject || "Umum");
+    if (subject === null) return;
+    const topic = prompt("Masukkan Bab / Topik (misal: Tekanan Zat):", "Umum");
+    if (topic === null) return;
+
+    const questionsToSave = exam.questions.filter(q => selectedQs.includes(q.id));
+    const success = await bulkSaveToBank(questionsToSave, subject, topic);
+    
+    if (success) {
+      alert(`Berhasil menyimpan ${questionsToSave.length} soal ke Bank Soal!`);
+      setSelectedQs([]); // Reset centang
+    } else {
+      alert("Gagal menyimpan soal ke Bank.");
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedQs(prev => prev.includes(id) ? prev.filter(qId => qId !== id) : [...prev, id]);
+  }
+
+  function toggleSelectAll() {
+    if (!exam) return;
+    if (selectedQs.length === exam.questions.length) setSelectedQs([]);
+    else setSelectedQs(exam.questions.map(q => q.id));
   }
 
   function deleteQuestion(id: string) {
     if (!exam || !confirm("Hapus soal ini?")) return;
     updateExam({ questions: exam.questions.filter((q) => q.id !== id) });
+    setSelectedQs(prev => prev.filter(qId => qId !== id));
   }
 
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
@@ -166,7 +199,6 @@ export function ExamEditor({ examId }: Props) {
     setIsImporting(false);
   }
 
-  // Bank Soal Logic
   async function openBank() {
     const data = await fetchBankQuestions();
     setBankQuestions(data);
@@ -176,12 +208,9 @@ export function ExamEditor({ examId }: Props) {
 
   function addFromBank() {
     if (!exam || selectedBankIds.length === 0) return;
-    
-    // Ambil soal yang dipilih, beri ID baru, dan masukkan ke ujian
     const toAdd = bankQuestions
       .filter(q => selectedBankIds.includes(q.id))
-      .map(q => ({ ...q, id: crypto.randomUUID(), examId: exam.id, ownerId: undefined, subject: undefined }));
-      
+      .map(q => ({ ...q, id: crypto.randomUUID(), examId: exam.id, ownerId: undefined, subject: undefined, topic: undefined }));
     updateExam({ questions: [...exam.questions, ...toAdd] });
     setBankModalOpen(false);
   }
@@ -251,13 +280,22 @@ export function ExamEditor({ examId }: Props) {
           <div className="flex flex-col sm:flex-row justify-between gap-3 mb-3">
             <div>
               <h2 className="font-semibold text-slate-900">Daftar Soal ({exam.questions.length})</h2>
-              <p className="text-xs text-slate-500">Mendukung 8 tipe soal</p>
+              <p className="text-xs text-slate-500">Centang soal untuk menyimpannya ke Bank Soal sekaligus.</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              
+              {/* TOMBOL BULK SAVE KE BANK */}
+              {selectedQs.length > 0 && (
+                <Button variant="secondary" size="sm" onClick={handleBulkSaveToBank} className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 animate-fade-in-up">
+                  <BookMarked className="w-4 h-4 mr-1.5" />Simpan {selectedQs.length} Soal ke Bank
+                </Button>
+              )}
+
               <Button variant="secondary" size="sm" onClick={openBank} className="border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"><BookMarked className="w-4 h-4 mr-1.5" />Ambil dari Bank</Button>
               <Button variant="secondary" size="sm" onClick={downloadTemplateImport}><FileSpreadsheet className="w-4 h-4 mr-1.5 text-slate-600" />Template</Button>
               <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting}><Upload className="w-4 h-4 mr-1.5 text-slate-600" />{isImporting ? "..." : "Import"}</Button>
               <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleImportExcel} />
+              
               {!editingQuestion && !pilihTipe && (
                 <button onClick={() => setPilihTipe(true)} className="inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] px-3 py-1.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"><Plus className="w-4 h-4 mr-1.5" />Tambah</button>
               )}
@@ -284,10 +322,32 @@ export function ExamEditor({ examId }: Props) {
             </Card>
           )}
 
+          {/* SELECT ALL */}
+          {exam.questions.length > 0 && (
+            <div className="flex items-center gap-2 mb-2 px-2">
+              <input 
+                type="checkbox" 
+                checked={selectedQs.length === exam.questions.length && exam.questions.length > 0} 
+                onChange={toggleSelectAll} 
+                className="w-4 h-4 rounded accent-emerald-600 cursor-pointer"
+              />
+              <span className="text-sm text-slate-500 font-medium cursor-pointer" onClick={toggleSelectAll}>Pilih Semua Soal</span>
+            </div>
+          )}
+
           {exam.questions.map((q, index) => (
-            <Card key={q.id} className="p-4 mb-3">
+            <Card key={q.id} className={`p-4 mb-3 transition ${selectedQs.includes(q.id) ? 'border-blue-400 ring-1 ring-blue-500/20 bg-blue-50/10' : ''}`}>
               <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 font-bold text-xs flex items-center justify-center shrink-0">{index + 1}</div>
+                {/* CHECKBOX BULK */}
+                <input 
+                  type="checkbox" 
+                  checked={selectedQs.includes(q.id)} 
+                  onChange={() => toggleSelect(q.id)} 
+                  className="w-5 h-5 mt-1 rounded accent-emerald-600 cursor-pointer shrink-0"
+                />
+                
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">{index + 1}</div>
+                
                 <div className="flex-1 min-w-0">
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 uppercase mb-2 inline-block">{TIPE_LABEL[q.type]}</span>
                   <div className="font-medium text-slate-900 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
@@ -426,7 +486,7 @@ export function ExamEditor({ examId }: Props) {
 
                 <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-slate-100">
                   <Button variant="secondary" className="flex-1" onClick={cancelQuestionForm}>Batal</Button>
-                  <Button variant="secondary" className="flex-1 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100" onClick={handleSaveToBank}><BookMarked className="w-4 h-4 mr-1.5" />Simpan ke Bank</Button>
+                  <Button variant="secondary" className="flex-1 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100" onClick={handleSaveToBankSingle}><BookMarked className="w-4 h-4 mr-1.5" />Simpan 1 Soal ke Bank</Button>
                   <button onClick={saveQuestion} className="flex-1 inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"><Save className="w-4 h-4 mr-1.5" />Simpan Soal</button>
                 </div>
               </div>
@@ -468,6 +528,7 @@ export function ExamEditor({ examId }: Props) {
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase">{TIPE_LABEL[q.type]}</span>
                             <span className="text-xs text-slate-400">{q.subject}</span>
+                            {q.topic && <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Bab: {q.topic}</span>}
                           </div>
                           <div className="font-medium text-slate-900 mb-1 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
                           {q.image && <img src={q.image} className="max-h-16 rounded border mt-2" />}

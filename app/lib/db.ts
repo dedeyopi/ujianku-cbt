@@ -1,7 +1,6 @@
 import { supabase } from "./supabase";
 import type { Exam, Question, ExamResult, ActiveSession } from "./types";
 
-// Fungsi pengaman untuk mengubah data JSONB (String -> Objek)
 function safeParse(json: any) {
   if (typeof json === 'string') {
     try { return JSON.parse(json); } catch(e) { return {}; }
@@ -9,20 +8,18 @@ function safeParse(json: any) {
   return json || {};
 }
 
-// --- FUNGSI BANTU (Mapping) ---
 function mapDbQuestionToQuestion(dbQ: any): Question {
   const correctAns = safeParse(dbQ.correct_answer);
   const opts = safeParse(dbQ.options);
   const optImgs = safeParse(dbQ.option_images);
 
   return {
-    id: dbQ.id, 
-    type: dbQ.type, 
-    question: dbQ.question, 
-    image: dbQ.image_url,
+    id: dbQ.id, type: dbQ.type, question: dbQ.question, image: dbQ.image_url,
     options: Array.isArray(opts) ? opts : undefined, 
     optionImages: Array.isArray(optImgs) ? optImgs : undefined, 
     ...correctAns, 
+    subject: dbQ.subject || undefined,
+    topic: dbQ.topic || undefined,
   };
 }
 
@@ -37,7 +34,6 @@ function mapQuestionToDb(examId: string, q: Question, index: number) {
   };
 }
 
-// --- CRUD UJIAN ---
 export async function fetchExams(): Promise<Exam[]> {
   const { data: exams, error } = await supabase.from("exams").select("*, questions(*)").order("created_at", { ascending: false });
   if (error) return [];
@@ -111,19 +107,14 @@ export async function duplicateExam(examId: string): Promise<boolean> {
   if (!exam) return false;
 
   const newExam: Exam = {
-    ...exam,
-    id: crypto.randomUUID(),
-    title: `${exam.title} (Salinan)`,
-    isActive: false,
-    token: undefined,
-    startTime: undefined,
-    endTime: undefined,
+    ...exam, id: crypto.randomUUID(), title: `${exam.title} (Salinan)`, isActive: false,
+    token: undefined, startTime: undefined, endTime: undefined,
     questions: exam.questions.map(q => ({ ...q, id: crypto.randomUUID() }))
   };
   return await saveExam(newExam);
 }
 
-// --- HASIL UJIAN ---
+// --- HASIL UJIAN & MONITORING ---
 export async function submitResult(result: ExamResult): Promise<boolean> {
   await supabase.from("results").delete().eq("exam_id", result.examId).eq("student_id", result.studentId);
   const { error } = await supabase.from("results").insert({
@@ -141,9 +132,7 @@ export async function fetchResultsByExam(examId: string): Promise<ExamResult[]> 
     id: r.id, examId: r.exam_id, examTitle: "", studentId: r.student_id,
     studentName: r.users?.full_name || "Siswa", className: r.users?.class_name || "-",
     score: r.score, correct: r.correct, total: r.total, violations: r.violations,
-    submittedAt: r.submitted_at, 
-    answers: safeParse(r.answers),
-    manualGrades: safeParse(r.manual_grades),
+    submittedAt: r.submitted_at, answers: safeParse(r.answers), manualGrades: safeParse(r.manual_grades),
   }));
 }
 
@@ -163,7 +152,6 @@ export async function updateResultGrades(resultId: string, newScore: number, man
   return !error;
 }
 
-// --- FUNGSI LIVE MONITOR ---
 export async function syncActiveSession(session: ActiveSession): Promise<void> {
   await supabase.from("active_sessions").upsert({
     id: session.id, exam_id: session.examId, student_id: session.studentId,
@@ -193,21 +181,15 @@ export async function fetchBankQuestions(): Promise<Question[]> {
   return data.map(mapDbQuestionToQuestion);
 }
 
-export async function saveQuestionToBank(q: Question, subject: string): Promise<boolean> {
+// Simpan Satu Soal
+export async function saveQuestionToBank(q: Question, subject: string, topic: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
 
   const dbQ = {
-    id: crypto.randomUUID(),
-    exam_id: null,
-    owner_id: user.id,
-    subject: subject,
-    type: q.type,
-    question: q.question,
-    image_url: q.image,
-    options: q.options || null,
-    option_images: q.optionImages || null,
-    order_index: 0, // <-- TAMBAHKAN INI UNTUK MENGATASI ERROR NOT NULL
+    id: crypto.randomUUID(), exam_id: null, owner_id: user.id, subject: subject, topic: topic,
+    type: q.type, question: q.question, image_url: q.image,
+    options: q.options || null, option_images: q.optionImages || null, order_index: 0,
     correct_answer: {
       correctAnswer: q.correctAnswer, correctAnswers: q.correctAnswers, trueFalseAnswer: q.trueFalseAnswer,
       statements: q.statements, pairs: q.pairs, items: q.items, acceptedAnswers: q.acceptedAnswers,
@@ -215,12 +197,26 @@ export async function saveQuestionToBank(q: Question, subject: string): Promise<
   };
 
   const { error } = await supabase.from("questions").insert(dbQ);
-  
-  if (error) {
-    console.error("Error saving to bank:", error.message); // Log error agar ketahuan jika ada masalah lain
-    return false;
-  }
-  return true;
+  return !error;
+}
+
+// Simpan Banyak Soal (Bulk)
+export async function bulkSaveToBank(questions: Question[], subject: string, topic: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const dbQs = questions.map(q => ({
+    id: crypto.randomUUID(), exam_id: null, owner_id: user.id, subject: subject, topic: topic,
+    type: q.type, question: q.question, image_url: q.image,
+    options: q.options || null, option_images: q.optionImages || null, order_index: 0,
+    correct_answer: {
+      correctAnswer: q.correctAnswer, correctAnswers: q.correctAnswers, trueFalseAnswer: q.trueFalseAnswer,
+      statements: q.statements, pairs: q.pairs, items: q.items, acceptedAnswers: q.acceptedAnswers,
+    }
+  }));
+
+  const { error } = await supabase.from("questions").insert(dbQs);
+  return !error;
 }
 
 export async function deleteBankQuestion(id: string): Promise<boolean> {

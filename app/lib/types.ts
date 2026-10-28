@@ -40,6 +40,7 @@ export type Question = {
   examId?: string | null;
   ownerId?: string;
   subject?: string;
+  topic?: string;
 };
 
 export type Exam = {
