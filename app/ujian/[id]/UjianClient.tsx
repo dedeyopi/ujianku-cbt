@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Maximize, Lock, Loader2, Clock, ArrowRight } from "lucide-react";
-import { Card } from "../../components/Card";
 import { supabase } from "../../lib/supabase";
 import { getSession, saveSession, clearSession } from "../../lib/session";
 import { fetchExamForStudent, syncActiveSession, removeActiveSession } from "../../lib/db";
@@ -250,7 +249,6 @@ export function UjianClient() {
       <main className="min-h-screen flex items-center justify-center p-6 bg-[#0B1120] relative overflow-hidden">
         <div className="absolute top-0 left-1/2 w-[600px] h-[600px] bg-blue-600/20 rounded-full blur-[100px] -translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
         
-        {/* PERBAIKAN: Menggunakan div biasa, bukan Card, agar tema gelap benar-benar diterapkan */}
         <div className="p-8 max-w-lg w-full text-center bg-slate-800 border border-slate-700 shadow-2xl relative z-10 rounded-3xl">
           <div className="w-20 h-20 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center mx-auto mb-6 shadow-inner">
             <Lock className="w-10 h-10 text-amber-400" />
@@ -287,7 +285,7 @@ export function UjianClient() {
         {/* Modal Peringatan Pelanggaran */}
         {showWarning && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-            <Card className="p-8 max-w-md w-full bg-slate-800 border-2 border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-fade-in-up">
+            <div className="p-8 max-w-md w-full bg-slate-800 border-2 border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-fade-in-up rounded-3xl">
               <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4 border border-red-500/30">
                 <AlertTriangle className="w-7 h-7 text-red-500" />
               </div>
@@ -298,12 +296,12 @@ export function UjianClient() {
                 <p className="text-4xl font-black text-red-500">{violations}<span className="text-lg text-red-400 font-normal">x</span></p>
               </div>
               <button onClick={() => setShowWarning(false)} className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition">Kembali ke Ujian</button>
-            </Card>
+            </div>
           </div>
         )}
 
-        {/* Header Ujian */}
-        <Card className="p-5 mb-5 flex justify-between items-center bg-slate-800/80 backdrop-blur-md border border-slate-700 shadow-lg">
+        {/* Header Ujian (Ganti Card menjadi div gelap) */}
+        <div className="p-5 mb-5 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
               <span className="font-black text-amber-400 text-lg">{nama.charAt(0)}</span>
@@ -313,22 +311,22 @@ export function UjianClient() {
               <p className="font-bold text-white text-lg leading-tight">{nama}</p>
             </div>
           </div>
-          <div className="text-right bg-slate-900/50 px-4 py-2 rounded-xl border border-slate-700/50">
+          <div className="text-right bg-slate-900 px-4 py-2 rounded-xl border border-slate-700">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center justify-end gap-1"><Clock className="w-3 h-3"/> Sisa Waktu</p>
             <p className={`font-black text-2xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-400"}`}>
               {Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}
             </p>
           </div>
-        </Card>
+        </div>
 
-        {/* Konten Soal */}
-        <Card className="p-6 sm:p-8 mb-5 bg-slate-800/80 backdrop-blur-md border border-slate-700 shadow-xl rounded-3xl">
-          <div className="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-4">
+        {/* Konten Soal (Ganti Card menjadi div gelap) */}
+        <div className="p-6 sm:p-8 mb-5 bg-slate-800 border border-slate-700 shadow-xl rounded-3xl">
+          <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
             <p className="text-sm font-bold text-slate-300 uppercase tracking-wider">Soal {nomorSoal + 1} <span className="text-slate-500 font-normal">dari {exam.questions.length}</span></p>
             {savedFlash && <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fade-in-up"><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
           </div>
           
-          {/* Pertanyaan Besar */}
+          {/* Pertanyaan */}
           <div className="text-xl sm:text-2xl font-medium text-white mb-8 leading-relaxed" dangerouslySetInnerHTML={{ __html: soal.question }} />
           
           {soal.image && <img src={soal.image} className="max-h-64 mb-8 rounded-xl border border-slate-600 shadow-md" />}
@@ -377,7 +375,7 @@ export function UjianClient() {
             {soal.type === "multi_true_false" && soal.statements?.map((st, i) => {
               const curr = ans || {};
               return (
-                <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border border-slate-600 bg-slate-800 rounded-xl gap-4">
+                <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border border-slate-600 bg-slate-900 rounded-xl gap-4">
                   <div className="text-base text-slate-200 flex-1 prose prose-sm max-w-none prose-invert" dangerouslySetInnerHTML={{ __html: st.text }} />
                   <div className="flex gap-2 shrink-0">
                     <button onClick={() => updateJawaban(soal.id, {...curr, [i]: true})} className={`px-6 py-2.5 rounded-lg border-2 text-sm font-bold transition-all ${curr[i] === true ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>BENAR</button>
@@ -393,7 +391,7 @@ export function UjianClient() {
                   const curr = ans || {};
                   return (
                     <div key={i} className="flex flex-col sm:flex-row gap-3 items-center">
-                      <div className="flex-1 w-full p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-base text-slate-200 prose prose-sm max-w-none prose-invert" dangerouslySetInnerHTML={{ __html: p.left }} />
+                      <div className="flex-1 w-full p-4 bg-slate-900 border border-slate-700 rounded-xl text-base text-slate-200 prose prose-sm max-w-none prose-invert" dangerouslySetInnerHTML={{ __html: p.left }} />
                       <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-4 rounded-xl border-2 border-slate-600 bg-slate-800 text-base text-white focus:border-amber-400 focus:outline-none">
                         <option value="" disabled>-- Pilih Pasangan --</option>
                         {soal.pairs?.map(pr => <option key={pr.right} value={pr.right}>{pr.right.replace(/<[^>]*>?/gm, '')}</option>)}
@@ -420,30 +418,30 @@ export function UjianClient() {
             )}
 
             {soal.type === "short_answer" && (
-              <input type="text" value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban Anda..." className="w-full p-5 border-2 border-slate-600 bg-slate-900/50 rounded-xl text-xl text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none transition" />
+              <input type="text" value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban Anda..." className="w-full p-5 border-2 border-slate-600 bg-slate-900 rounded-xl text-xl text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none transition" />
             )}
 
             {soal.type === "essay" && (
               <div>
-                <textarea rows={8} value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban panjang Anda di sini..." className="w-full p-5 border-2 border-slate-600 bg-slate-900/50 rounded-xl text-base text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none resize-none transition" />
+                <textarea rows={8} value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban panjang Anda di sini..." className="w-full p-5 border-2 border-slate-600 bg-slate-900 rounded-xl text-base text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none resize-none transition" />
                 <p className="text-sm font-medium text-amber-500 mt-2">Jawaban esai akan dinilai manual oleh guru.</p>
               </div>
             )}
           </div>
-        </Card>
+        </div>
 
-        {/* Navigasi Soal */}
-        <Card className="p-5 mb-5 bg-slate-800/80 backdrop-blur-md border border-slate-700 shadow-lg rounded-2xl">
+        {/* Navigasi Soal (Ganti Card menjadi div gelap) */}
+        <div className="p-5 mb-5 bg-slate-800 border border-slate-700 shadow-lg rounded-2xl">
           <p className="text-sm font-semibold text-slate-400 mb-3">Navigasi Soal:</p>
           <div className="flex flex-wrap gap-2">
             {exam.questions.map((q, i) => {
               const answered = jawaban[q.id] !== undefined && (Array.isArray(jawaban[q.id]) ? jawaban[q.id].length > 0 : jawaban[q.id] !== "");
               return (
-                <button key={q.id} onClick={() => setNomorSoal(i)} className={`w-11 h-11 rounded-xl font-bold text-base transition-all ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-800 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>
+                <button key={q.id} onClick={() => setNomorSoal(i)} className={`w-11 h-11 rounded-xl font-bold text-base transition-all ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>
               );
             })}
           </div>
-        </Card>
+        </div>
 
         {/* Tombol Aksi Bawah */}
         <div className="flex justify-between gap-4 mt-8">
