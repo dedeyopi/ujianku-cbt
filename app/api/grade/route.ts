@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../lib/supabaseAdmin";
-import type { Question } from "../../../lib/types";
+import { supabaseAdmin } from "../../lib/supabaseAdmin"; // Perbaikan: Hanya 2 titik
+import type { Question } from "../../lib/types"; // Perbaikan: Hanya 2 titik
 
 // Fungsi penilaian (sama seperti sebelumnya, tapi berjalan di server)
 function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
