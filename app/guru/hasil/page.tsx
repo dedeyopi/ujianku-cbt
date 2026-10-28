@@ -64,11 +64,11 @@ export default function HasilUjianPage() {
     setIsFetchingResults(false);
   }
 
-  // FUNGSI REFRESH YANG DIPERBAIKI: Mengambil kunci jawaban terbaru juga
+  // FUNGSI INI DIPERBAIKI: Mengambil ulang data ujian (kunci jawaban) & hasil siswa
   async function handleRefresh() {
     setIsRefreshing(true);
     
-    // 1. Ambil ulang daftar ujian (untuk memperbarui kunci jawaban di memori)
+    // 1. Ambil ulang daftar ujian (memuat kunci jawaban terbaru ke memori)
     const allExams = await fetchExams();
     setExams(allExams);
 
@@ -94,8 +94,7 @@ export default function HasilUjianPage() {
       
       if (res.ok) {
         alert(`Sinkronisasi berhasil! ${data.updatedCount} nilai siswa diperbarui.`);
-        // Panggil handleRefresh untuk memperbarui tabel nilai DAN kunci jawaban di layar analisis
-        await handleRefresh();
+        await handleRefresh(); // Panggil handleRefresh untuk update tabel & kunci jawaban
       } else {
         alert("Gagal sinkronisasi: " + data.error);
       }
