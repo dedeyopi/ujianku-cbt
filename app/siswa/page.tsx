@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, BookOpen, Clock, LogOut, ArrowRight, History, Trophy, CheckCircle2 } from "lucide-react";
+import { GraduationCap, BookOpen, Clock, LogOut, ArrowRight, History, Trophy, CheckCircle2, Key } from "lucide-react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { fetchExams, fetchStudentResults } from "../lib/db"; 
@@ -17,6 +17,11 @@ export default function SiswaPage() {
   const [history, setHistory] = useState<ExamResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"tersedia" | "riwayat">("tersedia");
+
+  // State untuk modal token
+  const [tokenModalOpen, setTokenModalOpen] = useState(false);
+  const [selectedExamForToken, setSelectedExamForToken] = useState<Exam | null>(null);
+  const [tokenInput, setTokenInput] = useState("");
 
   useEffect(() => {
     async function init() {
@@ -42,11 +47,38 @@ export default function SiswaPage() {
     router.push("/");
   }
 
+  function handleMulaiUjian(exam: Exam) {
+    const now = new Date().getTime();
+    if (exam.startTime && now < new Date(exam.startTime).getTime()) {
+      alert("Ujian belum dimulai. Tunggu instruksi guru.");
+      return;
+    }
+    if (exam.endTime && now > new Date(exam.endTime).getTime()) {
+      alert("Waktu ujian sudah habis.");
+      return;
+    }
+
+    if (exam.token && exam.token.trim() !== "") {
+      setSelectedExamForToken(exam);
+      setTokenInput("");
+      setTokenModalOpen(true);
+    } else {
+      router.push(`/ujian/${exam.id}`);
+    }
+  }
+
+  function submitToken() {
+    if (tokenInput === selectedExamForToken?.token) {
+      router.push(`/ujian/${selectedExamForToken.id}`);
+    } else {
+      alert("Token salah! Silakan coba lagi.");
+    }
+  }
+
   if (loading || !student) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Memuat...</p></div>;
   }
 
-  // Cek apakah ujian sudah pernah dikerjakan
   const getResultForExam = (examId: string) => {
     return history.find(h => h.examId === examId);
   };
@@ -98,13 +130,14 @@ export default function SiswaPage() {
                     <div className="flex items-center gap-4 text-xs text-slate-500 mb-4">
                       <span className="inline-flex items-center gap-1"><BookOpen className="w-3.5 h-3.5" />{exam.questions.length} soal</span>
                       <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{Math.floor(exam.duration / 60)} menit</span>
+                      {exam.token && <span className="inline-flex items-center gap-1 text-amber-600"><Key className="w-3.5 h-3.5" />Pakai Token</span>}
                     </div>
                     {existingResult ? (
                       <div className="w-full py-2 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center gap-2 font-semibold text-sm border border-emerald-100">
                         <CheckCircle2 className="w-4 h-4" /> Selesai (Nilai: {existingResult.score})
                       </div>
                     ) : (
-                      <Button onClick={() => router.push(`/ujian/${exam.id}`)} size="sm" className="w-full">
+                      <Button onClick={() => handleMulaiUjian(exam)} size="sm" className="w-full">
                         Mulai Ujian <ArrowRight className="w-4 h-4 ml-1.5" />
                       </Button>
                     )}
@@ -148,6 +181,34 @@ export default function SiswaPage() {
           )
         )}
       </div>
+
+      {/* MODAL TOKEN */}
+      {tokenModalOpen && selectedExamForToken && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-sm p-6 text-center animate-fade-in-up">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Key className="w-6 h-6 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Masukkan Token</h3>
+            <p className="text-sm text-slate-500 mb-4">Tanyakan token kepada guru Anda.</p>
+            
+            <input
+              type="text"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
+              placeholder="XXXXXX"
+              className="w-full text-center text-2xl font-mono tracking-[0.5em] uppercase px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 mb-4"
+              maxLength={10}
+              autoFocus
+            />
+            
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setTokenModalOpen(false)}>Batal</Button>
+              <Button className="flex-1" onClick={submitToken}>Masuk</Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </main>
   );
 }

@@ -43,6 +43,7 @@ export async function fetchExams(): Promise<Exam[]> {
   if (error) return [];
   return exams.map((e: any) => ({
     id: e.id, title: e.title, subject: e.subject, duration: e.duration, isActive: e.is_active, createdAt: e.created_at,
+    token: e.token, startTime: e.start_time, endTime: e.end_time,
     questions: (e.questions || []).sort((a: any, b: any) => a.order_index - b.order_index).map(mapDbQuestionToQuestion),
   }));
 }
@@ -52,17 +53,18 @@ export async function fetchExamById(id: string): Promise<Exam | null> {
   if (error || !exam) return null;
   return {
     id: exam.id, title: exam.title, subject: exam.subject, duration: exam.duration, isActive: exam.is_active, createdAt: exam.created_at,
+    token: exam.token, startTime: exam.start_time, endTime: exam.end_time,
     questions: (exam.questions || []).sort((a: any, b: any) => a.order_index - b.order_index).map(mapDbQuestionToQuestion),
   };
 }
 
-// Fungsi aman untuk siswa (tanpa kunci jawaban)
 export async function fetchExamForStudent(id: string): Promise<Exam | null> {
   const { data: exam, error } = await supabase.from("exams").select("*, questions(*)").eq("id", id).single();
   if (error || !exam) return null;
 
   return {
     id: exam.id, title: exam.title, subject: exam.subject, duration: exam.duration, isActive: exam.is_active, createdAt: exam.created_at,
+    token: exam.token, startTime: exam.start_time, endTime: exam.end_time,
     questions: (exam.questions || []).sort((a: any, b: any) => a.order_index - b.order_index).map((dbQ: any) => {
         const correctAns = safeParse(dbQ.correct_answer);
         const opts = safeParse(dbQ.options);
@@ -86,6 +88,7 @@ export async function fetchExamForStudent(id: string): Promise<Exam | null> {
 export async function saveExam(exam: Exam): Promise<boolean> {
   const { error: examError } = await supabase.from("exams").upsert({
     id: exam.id, title: exam.title, subject: exam.subject, duration: exam.duration, is_active: exam.isActive,
+    token: exam.token || null, start_time: exam.startTime || null, end_time: exam.endTime || null,
   });
   if (examError) return false;
 
@@ -112,6 +115,9 @@ export async function duplicateExam(examId: string): Promise<boolean> {
     id: crypto.randomUUID(),
     title: `${exam.title} (Salinan)`,
     isActive: false,
+    token: undefined,
+    startTime: undefined,
+    endTime: undefined,
     questions: exam.questions.map(q => ({ ...q, id: crypto.randomUUID() }))
   };
   return await saveExam(newExam);
@@ -136,8 +142,8 @@ export async function fetchResultsByExam(examId: string): Promise<ExamResult[]> 
     studentName: r.users?.full_name || "Siswa", className: r.users?.class_name || "-",
     score: r.score, correct: r.correct, total: r.total, violations: r.violations,
     submittedAt: r.submitted_at, 
-    answers: safeParse(r.answers), // Parsing aman
-    manualGrades: safeParse(r.manual_grades), // Parsing aman
+    answers: safeParse(r.answers),
+    manualGrades: safeParse(r.manual_grades),
   }));
 }
 

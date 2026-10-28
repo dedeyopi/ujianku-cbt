@@ -63,7 +63,7 @@ export function UjianClient() {
   const [isResume, setIsResume] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [selesai, setSelesai] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false); // State untuk loading submit
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [studentData, setStudentData] = useState<{ id: string; className: string } | null>(null);
 
@@ -78,7 +78,6 @@ export function UjianClient() {
       const { data: profile } = await supabase.from("users").select("full_name, class_name").eq("id", user.id).single();
       if (!profile) { router.push("/siswa/login"); return; }
 
-      // CEK: Apakah sudah pernah mengerjakan?
       const { data: existingResult } = await supabase
         .from("results")
         .select("id")
@@ -110,9 +109,8 @@ export function UjianClient() {
         setSisaWaktu(sisa);
         setIsResume(true);
         
-        // Jika waktu sudah habis saat resume, langsung submit
         if (sisa <= 0) {
-           setSelesai(true); // Kunci layar
+           setSelesai(true);
         }
       } else {
         const initialAnswers: Record<string, any> = {};
@@ -186,8 +184,18 @@ export function UjianClient() {
     setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1200);
   }, [jawaban, exam, examId]);
 
+  // TIMER: Cek waktu global (endTime) & waktu lokal (sisaWaktu)
   useEffect(() => {
     if (!exam || showStartPrompt || selesai) return;
+    
+    if (exam.endTime) {
+      const now = new Date().getTime();
+      if (now > new Date(exam.endTime).getTime()) {
+        submitExam(true);
+        return;
+      }
+    }
+
     if (sisaWaktu <= 0) { submitExam(true); return; }
     const t = setTimeout(() => setSisaWaktu(w => w - 1), 1000);
     return () => clearTimeout(t);
@@ -229,7 +237,6 @@ export function UjianClient() {
       if (belum > 0 && !confirm(`Masih ada ${belum} soal belum dijawab. Yakin kirim?`)) return;
     }
     
-    // Kunci layar dan tampilkan loading
     setSelesai(true);
     setIsSubmitting(true);
 
@@ -262,7 +269,6 @@ export function UjianClient() {
     } catch (err: any) {
       alert("Terjadi kesalahan sistem saat mengirim jawaban: " + err.message);
       setIsSubmitting(false);
-      // Jika error karena jaringan, jangan biarkan siswa keluar
       if (auto) alert("Koneksi terputus. Harap sambungkan kembali internet Anda dan refresh halaman ini.");
     }
   }
@@ -271,7 +277,6 @@ export function UjianClient() {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Menyiapkan soal...</p></div>;
   }
 
-  // LAYAR PENGUNCIAN SAAT SUBMIT / WAKTU HABIS
   if (isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6">
@@ -336,7 +341,6 @@ export function UjianClient() {
           {soal.image && <img src={soal.image} className="max-h-64 mb-4 rounded-xl border" />}
 
           <div className="space-y-4">
-            {/* Tipe Soal: PG */}
             {soal.type === "multiple_choice" && soal.options?.map((opt, i) => {
               const identifier = opt || `Opsi ${i+1}`;
               const img = soal.optionImages?.[i];
@@ -349,7 +353,6 @@ export function UjianClient() {
               );
             })}
 
-            {/* Tipe Soal: PG Kompleks */}
             {soal.type === "complex_mc" && soal.options?.map((opt, i) => {
               const identifier = opt || `Opsi ${i+1}`;
               const img = soal.optionImages?.[i];
@@ -366,7 +369,6 @@ export function UjianClient() {
               );
             })}
 
-            {/* Tipe Soal: B/S Tunggal */}
             {soal.type === "true_false" && (
               <div className="grid grid-cols-2 gap-3">
                 {[true, false].map(val => (
@@ -375,7 +377,6 @@ export function UjianClient() {
               </div>
             )}
 
-            {/* Tipe Soal: B/S Bertingkat */}
             {soal.type === "multi_true_false" && soal.statements?.map((st, i) => {
               const curr = ans || {};
               return (
@@ -389,7 +390,6 @@ export function UjianClient() {
               );
             })}
 
-            {/* Tipe Soal: Menjodohkan */}
             {soal.type === "matching" && (
               <div className="space-y-3">
                 {soal.pairs?.map((p, i) => {
@@ -407,7 +407,6 @@ export function UjianClient() {
               </div>
             )}
 
-            {/* Tipe Soal: Mengurutkan */}
             {soal.type === "ordering" && (
               <div className="space-y-2">
                 {(ans && Array.isArray(ans) ? ans : soal.items || []).map((item, i, arr) => (
@@ -423,12 +422,10 @@ export function UjianClient() {
               </div>
             )}
 
-            {/* Tipe Soal: Isian Singkat */}
             {soal.type === "short_answer" && (
               <input type="text" value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban..." className="w-full p-4 border-2 rounded-xl text-lg focus:border-blue-500 focus:outline-none" />
             )}
 
-            {/* Tipe Soal: Esai */}
             {soal.type === "essay" && (
               <div>
                 <textarea rows={6} value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban panjang Anda di sini..." className="w-full p-4 border-2 rounded-xl text-base focus:border-blue-500 focus:outline-none resize-none" />

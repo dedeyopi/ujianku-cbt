@@ -47,6 +47,9 @@ export type Exam = {
   questions: Question[];
   createdAt: string;
   isActive: boolean;
+  token?: string;        // <-- TAMBAHKAN INI
+  startTime?: string;    // <-- TAMBAHKAN INI
+  endTime?: string;      // <-- TAMBAHKAN INI
 };
 
 export type ExamSession = {

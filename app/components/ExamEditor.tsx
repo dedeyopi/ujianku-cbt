@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Save, Plus, Trash2, Edit3, Check, X, BookOpen,
   CheckCircle2, AlertCircle, ListChecks, ToggleLeft, Type,
-  ListTodo, Shuffle, Link, FileText, Upload, FileSpreadsheet, Image as ImageIcon
+  ListTodo, Shuffle, Link, FileText, Upload, FileSpreadsheet, Image as ImageIcon,
+  Key, Calendar
 } from "lucide-react";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { Input } from "./Input";
 import { ImageUploader } from "./ImageUploader";
-import { TextEditor } from "./TextEditor"; // Import TextEditor baru
+import { TextEditor } from "./TextEditor";
 import { fetchExamById, saveExam } from "../lib/db";
 import { isLoggedIn } from "../lib/auth";
 import { downloadTemplateImport, parseExcelToQuestions } from "../lib/excel";
@@ -23,6 +24,7 @@ function createEmptyExam(): Exam {
   return {
     id: crypto.randomUUID(), title: "", subject: "", duration: 600,
     questions: [], createdAt: new Date().toISOString(), isActive: false,
+    token: undefined, startTime: undefined, endTime: undefined,
   };
 }
 
@@ -101,6 +103,15 @@ export function ExamEditor({ examId }: Props) {
     return () => clearTimeout(timer);
   }, [exam, loading]);
 
+  function generateToken() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let result = "";
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    updateExam({ token: result });
+  }
+
   function updateExam(patch: Partial<Exam>) { if (exam) setExam({ ...exam, ...patch }); }
   function pilihTipeSoal(type: QuestionType) { setEditingQuestion(createEmptyQuestion(type)); setIsNewQuestion(true); setPilihTipe(false); setShowOptImage({}); }
   function cancelQuestionForm() { setEditingQuestion(null); setIsNewQuestion(false); setPilihTipe(false); setShowOptImage({}); }
@@ -108,7 +119,6 @@ export function ExamEditor({ examId }: Props) {
 
   function saveQuestion() {
     if (!exam || !editingQuestion) return;
-    // Cek jika pertanyaan kosong (mengabaikan tag html seperti <br> atau <p>)
     const strippedQuestion = editingQuestion.question.replace(/<[^>]*>?/gm, '').trim();
     if (!strippedQuestion) return alert("Pertanyaan tidak boleh kosong.");
     
@@ -171,6 +181,54 @@ export function ExamEditor({ examId }: Props) {
                 <input type="number" min={1} value={Math.floor(exam.duration / 60)} onChange={(e) => updateExam({ duration: Math.max(1, Number(e.target.value) || 1) * 60 })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" />
               </div>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Waktu Mulai (Opsional)</label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input 
+                    type="datetime-local" 
+                    value={exam.startTime ? new Date(new Date(exam.startTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""} 
+                    onChange={(e) => updateExam({ startTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })} 
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" 
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Waktu Selesai (Opsional)</label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input 
+                    type="datetime-local" 
+                    value={exam.endTime ? new Date(new Date(exam.endTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""} 
+                    onChange={(e) => updateExam({ endTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })} 
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" 
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Token Ujian (Opsional)</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Key className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input 
+                    type="text" 
+                    value={exam.token || ""} 
+                    onChange={(e) => updateExam({ token: e.target.value.toUpperCase() })} 
+                    placeholder="Contoh: X7K9P2" 
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition font-mono tracking-widest uppercase" 
+                    maxLength={10}
+                  />
+                </div>
+                <Button variant="secondary" onClick={generateToken} type="button">
+                  Buat Token
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Jika diisi, siswa harus memasukkan token ini untuk masuk.</p>
+            </div>
           </div>
         </Card>
 
@@ -218,7 +276,6 @@ export function ExamEditor({ examId }: Props) {
                 <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 font-bold text-xs flex items-center justify-center shrink-0">{index + 1}</div>
                 <div className="flex-1 min-w-0">
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 uppercase mb-2 inline-block">{TIPE_LABEL[q.type]}</span>
-                  {/* Render HTML untuk daftar soal */}
                   <div className="font-medium text-slate-900 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
                   {q.image && <img src={q.image} className="max-h-24 rounded-lg border border-slate-200 mb-2" />}
                   
