@@ -23,12 +23,13 @@ export async function POST(req: Request) {
     const questions = dbExam.questions.sort((a: any, b: any) => a.order_index - b.order_index);
     
     questions.forEach((dbQ: any) => {
-      const q = { 
-        id: dbQ.id, 
-        type: dbQ.type, 
-        question: dbQ.question, 
-        ...(dbQ.correct_answer || {}) 
-      };
+      // Perbaikan: Parse kunci jawaban
+      let correctAns = dbQ.correct_answer || {};
+      if (typeof correctAns === 'string') {
+        try { correctAns = JSON.parse(correctAns); } catch(e) { correctAns = {}; }
+      }
+      
+      const q = { id: dbQ.id, type: dbQ.type, question: dbQ.question, ...correctAns };
       
       if (isJawabanBenar(q as any, answers[dbQ.id])) {
         benar++;

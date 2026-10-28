@@ -3,9 +3,15 @@ import type { Exam, Question, ExamResult, ActiveSession } from "./types";
 
 // --- FUNGSI BANTU (Mapping) ---
 function mapDbQuestionToQuestion(dbQ: any): Question {
+  let correctAns = dbQ.correct_answer || {};
+  // Perbaikan: Jika Supabase mengembalikan string JSON, kita ubah jadi objek
+  if (typeof correctAns === 'string') {
+    try { correctAns = JSON.parse(correctAns); } catch(e) { correctAns = {}; }
+  }
+
   return {
     id: dbQ.id, type: dbQ.type, question: dbQ.question, image: dbQ.image_url,
-    options: dbQ.options, optionImages: dbQ.option_images, ...dbQ.correct_answer, 
+    options: dbQ.options, optionImages: dbQ.option_images, ...correctAns, 
   };
 }
 

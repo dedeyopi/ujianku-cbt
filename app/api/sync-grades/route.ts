@@ -9,7 +9,6 @@ export async function POST(req: Request) {
 
     if (!examId) return NextResponse.json({ error: "Exam ID required" }, { status: 400 });
 
-    // 1. Ambil kunci jawaban terbaru
     const { data: dbExam, error: examError } = await supabaseAdmin
       .from("exams")
       .select("*, questions(*)")
@@ -21,7 +20,6 @@ export async function POST(req: Request) {
     const questions = dbExam.questions.sort((a: any, b: any) => a.order_index - b.order_index);
     const totalSoal = questions.length;
 
-    // 2. Ambil semua hasil siswa untuk ujian ini
     const { data: results, error: resultError } = await supabaseAdmin
       .from("results")
       .select("*")
@@ -31,28 +29,36 @@ export async function POST(req: Request) {
 
     let updatedCount = 0;
 
-    // 3. Hitung ulang setiap siswa
     for (const res of results) {
       let correctAuto = 0;
       
+      // Perbaikan: Parse jawaban siswa jika bentuknya string
+      let studentAnswers = res.answers || {};
+      if (typeof studentAnswers === 'string') {
+        try { studentAnswers = JSON.parse(studentAnswers); } catch(e) { studentAnswers = {}; }
+      }
+
       questions.forEach((dbQ: any) => {
-        // Gabungkan data dasar soal dengan kunci jawaban dari database
-        const q = { 
-          id: dbQ.id, 
-          type: dbQ.type, 
-          question: dbQ.question, 
-          ...(dbQ.correct_answer || {}) 
-        };
+        // Perbaikan: Parse kunci jawaban jika bentuknya string
+        let correctAns = dbQ.correct_answer || {};
+        if (typeof correctAns === 'string') {
+          try { correctAns = JSON.parse(correctAns); } catch(e) { correctAns = {}; }
+        }
         
-        if (res.answers && isJawabanBenar(q as any, res.answers[dbQ.id])) {
+        const q = { id: dbQ.id, type: dbQ.type, question: dbQ.question, ...correctAns };
+        
+        if (studentAnswers && studentAnswers[dbQ.id] && isJawabanBenar(q as any, studentAnswers[dbQ.id])) {
           correctAuto++;
         }
       });
 
-      // Tambahkan nilai esai manual jika ada
       let essayContribution = 0;
       if (res.manual_grades) {
-        Object.values(res.manual_grades).forEach((score: any) => {
+        let mg = res.manual_grades;
+        if (typeof mg === 'string') {
+          try { mg = JSON.parse(mg); } catch(e) { mg = {}; }
+        }
+        Object.values(mg).forEach((score: any) => {
           essayContribution += (Number(score) / 100);
         });
       }
@@ -60,14 +66,12 @@ export async function POST(req: Request) {
       const totalPoin = correctAuto + essayContribution;
       const nilaiBaru = Math.round((totalPoin / totalSoal) * 100);
 
-      // Update database jika nilainya berbeda
-      if (nilaiBaru !== res.score) {
-        await supabaseAdmin
-          .from("results")
-          .update({ score: nilaiBaru, correct: correctAuto })
-          .eq("id", res.id);
-        updatedCount++;
-      }
+      // Selalu lakukan update untuk memastikan data 'correct' juga tersinkronisasi
+      await supabaseAdmin
+        .from("results")
+        .update({ score: nilaiBaru, correct: correctAuto })
+        .eq("id", res.id);
+      updatedCount++;
     }
 
     return NextResponse.json({ success: true, updatedCount, totalResults: results.length });
