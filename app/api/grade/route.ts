@@ -23,8 +23,16 @@ export async function POST(req: Request) {
     const questions = dbExam.questions.sort((a: any, b: any) => a.order_index - b.order_index);
     
     questions.forEach((dbQ: any) => {
-      const q = { id: dbQ.id, type: dbQ.type, question: dbQ.question, ...dbQ.correct_answer };
-      if (isJawabanBenar(q, answers[dbQ.id])) benar++;
+      const q = { 
+        id: dbQ.id, 
+        type: dbQ.type, 
+        question: dbQ.question, 
+        ...(dbQ.correct_answer || {}) 
+      };
+      
+      if (isJawabanBenar(q as any, answers[dbQ.id])) {
+        benar++;
+      }
     });
 
     const totalSoal = questions.length;

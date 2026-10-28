@@ -36,8 +36,15 @@ export async function POST(req: Request) {
       let correctAuto = 0;
       
       questions.forEach((dbQ: any) => {
-        const q = { id: dbQ.id, type: dbQ.type, question: dbQ.question, ...dbQ.correct_answer };
-        if (res.answers && isJawabanBenar(q, res.answers[dbQ.id])) {
+        // Gabungkan data dasar soal dengan kunci jawaban dari database
+        const q = { 
+          id: dbQ.id, 
+          type: dbQ.type, 
+          question: dbQ.question, 
+          ...(dbQ.correct_answer || {}) 
+        };
+        
+        if (res.answers && isJawabanBenar(q as any, res.answers[dbQ.id])) {
           correctAuto++;
         }
       });
