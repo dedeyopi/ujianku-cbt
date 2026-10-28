@@ -9,7 +9,7 @@ import { isLoggedIn } from "../../lib/auth";
 import { fetchExams, fetchResultsByExam, updateResultGrades } from "../../lib/db";
 import { exportResultsToExcel, exportQuestionAnalysisToExcel } from "../../lib/excel";
 import { supabase } from "../../lib/supabase";
-import { isJawabanBenar } from "../../lib/grading"; // Import dari file baru
+import { isJawabanBenar } from "../../lib/grading";
 import type { Exam, ExamResult, Question } from "../../lib/types";
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
@@ -64,10 +64,18 @@ export default function HasilUjianPage() {
     setIsFetchingResults(false);
   }
 
+  // FUNGSI REFRESH YANG DIPERBAIKI: Mengambil kunci jawaban terbaru juga
   async function handleRefresh() {
     setIsRefreshing(true);
+    
+    // 1. Ambil ulang daftar ujian (untuk memperbarui kunci jawaban di memori)
+    const allExams = await fetchExams();
+    setExams(allExams);
+
+    // 2. Ambil ulang hasil siswa
     const data = await fetchResultsByExam(selectedExamId);
     setResults(data);
+    
     setIsRefreshing(false);
   }
 
@@ -86,7 +94,8 @@ export default function HasilUjianPage() {
       
       if (res.ok) {
         alert(`Sinkronisasi berhasil! ${data.updatedCount} nilai siswa diperbarui.`);
-        await handleRefresh(); // Tarik data terbaru
+        // Panggil handleRefresh untuk memperbarui tabel nilai DAN kunci jawaban di layar analisis
+        await handleRefresh();
       } else {
         alert("Gagal sinkronisasi: " + data.error);
       }
