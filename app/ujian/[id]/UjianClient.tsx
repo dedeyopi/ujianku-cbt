@@ -8,7 +8,7 @@ import { Card } from "../../components/Card";
 import { supabase } from "../../lib/supabase";
 import { getSession, saveSession, clearSession } from "../../lib/session";
 import { fetchExamForStudent, syncActiveSession, removeActiveSession } from "../../lib/db";
-import type { Exam, ExamSession, Question, ActiveSession } from "../../lib/types";
+import type { Exam, ExamSession, Question } from "../../lib/types";
 
 function shuffleArrayWithSeed<T>(array: T[], seedString: string): T[] {
   let seed = 0;
@@ -45,32 +45,6 @@ function getRandomizedExam(exam: Exam, studentId: string): Exam {
   return { ...exam, questions: shuffledQuestions };
 }
 
-function isJawabanBenar(q: Question, jawabanSiswa: any): boolean {
-  if (jawabanSiswa === undefined || jawabanSiswa === null) return false;
-  const normalize = (s: string) => String(s).trim().toLowerCase();
-  switch (q.type) {
-    case "multiple_choice": return jawabanSiswa === q.correctAnswer;
-    case "complex_mc":
-      if (!Array.isArray(jawabanSiswa) || !q.correctAnswers) return false;
-      if (jawabanSiswa.length !== q.correctAnswers.length) return false;
-      return jawabanSiswa.every(ans => q.correctAnswers!.includes(ans));
-    case "true_false": return jawabanSiswa === q.trueFalseAnswer;
-    case "multi_true_false":
-      if (!q.statements) return false;
-      return q.statements.every((st, i) => jawabanSiswa[i] === st.isTrue);
-    case "matching":
-      if (!q.pairs || !jawabanSiswa) return false;
-      return q.pairs.every(p => jawabanSiswa[p.left] === p.right);
-    case "ordering":
-      if (!q.items || !Array.isArray(jawabanSiswa)) return false;
-      return q.items.every((item, i) => jawabanSiswa[i] === item);
-    case "short_answer":
-      const accepted = q.acceptedAnswers || [];
-      return accepted.some((a) => normalize(a) === normalize(jawabanSiswa));
-    default: return false;
-  }
-}
-
 export function UjianClient() {
   const params = useParams<{ id: string }>();
   const examId = params.id;
@@ -90,7 +64,6 @@ export function UjianClient() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [selesai, setSelesai] = useState(false);
   
-  // State untuk sinkronisasi Live Monitor
   const [studentData, setStudentData] = useState<{ id: string; className: string } | null>(null);
 
   const violationsRef = useRef(0);
@@ -104,6 +77,7 @@ export function UjianClient() {
       const { data: profile } = await supabase.from("users").select("full_name, class_name").eq("id", user.id).single();
       if (!profile) { router.push("/siswa/login"); return; }
 
+      // Menggunakan fungsi aman (tanpa kunci jawaban)
       const found = await fetchExamForStudent(examId);
       if (!found || !found.isActive) { router.push("/siswa"); return; }
       
@@ -140,7 +114,6 @@ export function UjianClient() {
     loadExam();
   }, [examId, router]);
 
-  // --- SINKRONISASI KE LIVE MONITOR ---
   useEffect(() => {
     if (!exam || !studentData || showStartPrompt || selesai) return;
 
@@ -159,11 +132,10 @@ export function UjianClient() {
     };
 
     sync();
-    const interval = setInterval(sync, 5000); // Ping setiap 10 detik
+    const interval = setInterval(sync, 5000);
     return () => clearInterval(interval);
   }, [exam, studentData, nama, nomorSoal, violations, showStartPrompt, selesai]);
 
-  // --- FITUR ANTI-CURANG (DISABLE KLIK KANAN, COPY, PASTE) ---
   useEffect(() => {
     if (showStartPrompt || selesai) return;
 
@@ -230,7 +202,7 @@ export function UjianClient() {
     setJawaban(prev => ({ ...prev, [soalId]: value }));
   }
 
-    async function submitExam(auto = false) {
+  async function submitExam(auto = false) {
     if (!exam || !studentData) return;
     if (!auto) {
       const belum = exam.questions.filter(q => jawaban[q.id] === undefined || (Array.isArray(jawaban[q.id]) && jawaban[q.id].length === 0) || jawaban[q.id] === "").length;
@@ -238,7 +210,6 @@ export function UjianClient() {
     }
     setSelesai(true);
 
-    // Kirim jawaban ke API Route (Server-Side Grading)
     try {
       const response = await fetch("/api/grade", {
         method: "POST",
@@ -257,12 +228,10 @@ export function UjianClient() {
         throw new Error(result.error || "Gagal mengirim jawaban.");
       }
 
-      // Simpan hasil ke localStorage untuk ditampilkan di halaman /hasil
       localStorage.setItem("hasilUjian", JSON.stringify({
         nama, examTitle: exam.title, benar: result.correct, total: result.total, nilai: result.score, violations: violationsRef.current
       }));
 
-      // Hapus dari Live Monitor
       await removeActiveSession(`${exam.id}_${studentData.id}`);
       clearSession(examId);
       
@@ -271,12 +240,8 @@ export function UjianClient() {
       
     } catch (err: any) {
       alert("Terjadi kesalahan sistem saat mengirim jawaban: " + err.message);
-      setSelesai(false); // Izinkan siswa mencoba kirim lagi
+      setSelesai(false);
     }
-  }
-    clearSession(examId);
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    router.push("/hasil");
   }
 
   if (loading || !exam) {
