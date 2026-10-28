@@ -132,3 +132,53 @@ export async function syncActiveSession(session: ActiveSession): Promise<void> {
 export async function removeActiveSession(sessionId: string): Promise<void> {
   await supabase.from("active_sessions").delete().eq("id", sessionId);
 }
+
+// --- FUNGSI AMAN UNTUK SISWA (TANPA KUNCI JAWABAN) ---
+export async function fetchExamForStudent(id: string): Promise<Exam | null> {
+  const { data: exam, error } = await supabase
+    .from("exams")
+    .select("*, questions(*)")
+    .eq("id", id)
+    .single();
+
+  if (error || !exam) return null;
+
+  return {
+    id: exam.id,
+    title: exam.title,
+    subject: exam.subject,
+    duration: exam.duration,
+    isActive: exam.is_active,
+    createdAt: exam.created_at,
+    questions: (exam.questions || [])
+      .sort((a: any, b: any) => a.order_index - b.order_index)
+      .map((dbQ: any) => {
+        // Ambil data soal dasar
+        const q: Question = {
+          id: dbQ.id,
+          type: dbQ.type,
+          question: dbQ.question,
+          image: dbQ.image_url,
+          options: dbQ.options,
+          optionImages: dbQ.option_images,
+        };
+        
+        // JANGAN kirim correctAnswer, correctAnswers, trueFalseAnswer, dll.
+        // Hanya kirim data yang dibutuhkan siswa untuk melihat soal.
+        if (q.type === "multi_true_false") {
+          // Untuk B/S bertingkat, kita butuh teks pernyataannya saja
+          q.statements = dbQ.correct_answer?.statements?.map((st: any) => ({ text: st.text })) || [];
+        }
+        if (q.type === "matching") {
+          // Untuk menjodohkan, kita butuh teks kiri dan kanan
+          q.pairs = dbQ.correct_answer?.pairs || [];
+        }
+        if (q.type === "ordering") {
+          // Untuk mengurutkan, kita butuh item-nya (nanti diacak di browser)
+          q.items = dbQ.correct_answer?.items || [];
+        }
+        
+        return q;
+      }),
+  };
+}

@@ -7,7 +7,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { supabase } from "../../lib/supabase";
 import { getSession, saveSession, clearSession } from "../../lib/session";
-import { fetchExamById, submitResult, syncActiveSession, removeActiveSession } from "../../lib/db";
+import { fetchExamForStudent, syncActiveSession, removeActiveSession } from "../../lib/db";
 import type { Exam, ExamSession, Question, ActiveSession } from "../../lib/types";
 
 function shuffleArrayWithSeed<T>(array: T[], seedString: string): T[] {
@@ -104,7 +104,7 @@ export function UjianClient() {
       const { data: profile } = await supabase.from("users").select("full_name, class_name").eq("id", user.id).single();
       if (!profile) { router.push("/siswa/login"); return; }
 
-      const found = await fetchExamById(examId);
+      const found = await fetchExamForStudent(examId);
       if (!found || !found.isActive) { router.push("/siswa"); return; }
       
       const randomizedExam = getRandomizedExam(found, user.id);
@@ -230,7 +230,7 @@ export function UjianClient() {
     setJawaban(prev => ({ ...prev, [soalId]: value }));
   }
 
-  async function submitExam(auto = false) {
+    async function submitExam(auto = false) {
     if (!exam || !studentData) return;
     if (!auto) {
       const belum = exam.questions.filter(q => jawaban[q.id] === undefined || (Array.isArray(jawaban[q.id]) && jawaban[q.id].length === 0) || jawaban[q.id] === "").length;
@@ -238,26 +238,42 @@ export function UjianClient() {
     }
     setSelesai(true);
 
-    let benar = 0;
-    exam.questions.forEach(q => { if (isJawabanBenar(q, jawaban[q.id])) benar++; });
-    const nilai = Math.round((benar / exam.questions.length) * 100);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await submitResult({
-        id: crypto.randomUUID(), examId: exam.id, examTitle: exam.title,
-        studentId: user.id, studentName: nama, className: studentData.className,
-        score: nilai, correct: benar, total: exam.questions.length, violations: violationsRef.current, submittedAt: new Date().toISOString(),
-        answers: jawaban,
+    // Kirim jawaban ke API Route (Server-Side Grading)
+    try {
+      const response = await fetch("/api/grade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          examId: exam.id,
+          studentId: studentData.id,
+          answers: jawaban,
+          violations: violationsRef.current
+        })
       });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Gagal mengirim jawaban.");
+      }
+
+      // Simpan hasil ke localStorage untuk ditampilkan di halaman /hasil
       localStorage.setItem("hasilUjian", JSON.stringify({
-        nama, examTitle: exam.title, benar, total: exam.questions.length, nilai, violations: violationsRef.current
+        nama, examTitle: exam.title, benar: result.correct, total: result.total, nilai: result.score, violations: violationsRef.current
       }));
+
+      // Hapus dari Live Monitor
+      await removeActiveSession(`${exam.id}_${studentData.id}`);
+      clearSession(examId);
+      
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      router.push("/hasil");
+      
+    } catch (err: any) {
+      alert("Terjadi kesalahan sistem saat mengirim jawaban: " + err.message);
+      setSelesai(false); // Izinkan siswa mencoba kirim lagi
     }
-
-    // Hapus dari Live Monitor karena sudah selesai
-    await removeActiveSession(`${exam.id}_${studentData.id}`);
-
+  }
     clearSession(examId);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     router.push("/hasil");
