@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Maximize, Lock, Loader2 } from "lucide-react";
-import { Button } from "../../components/Button";
+import { AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Maximize, Lock, Loader2, Clock } from "lucide-react";
 import { Card } from "../../components/Card";
 import { supabase } from "../../lib/supabase";
 import { getSession, saveSession, clearSession } from "../../lib/session";
@@ -78,18 +77,8 @@ export function UjianClient() {
       const { data: profile } = await supabase.from("users").select("full_name, class_name").eq("id", user.id).single();
       if (!profile) { router.push("/siswa/login"); return; }
 
-      const { data: existingResult } = await supabase
-        .from("results")
-        .select("id")
-        .eq("exam_id", examId)
-        .eq("student_id", user.id)
-        .maybeSingle();
-
-      if (existingResult) {
-        alert("Anda sudah mengerjakan ujian ini.");
-        router.push("/siswa");
-        return;
-      }
+      const { data: existingResult } = await supabase.from("results").select("id").eq("exam_id", examId).eq("student_id", user.id).maybeSingle();
+      if (existingResult) { alert("Anda sudah mengerjakan ujian ini."); router.push("/siswa"); return; }
 
       const found = await fetchExamForStudent(examId);
       if (!found || !found.isActive) { router.push("/siswa"); return; }
@@ -108,16 +97,11 @@ export function UjianClient() {
         const sisa = Math.max(0, found.duration - elapsed);
         setSisaWaktu(sisa);
         setIsResume(true);
-        
-        if (sisa <= 0) {
-           setSelesai(true);
-        }
+        if (sisa <= 0) setSelesai(true);
       } else {
         const initialAnswers: Record<string, any> = {};
         randomizedExam.questions.forEach(q => {
-          if (q.type === "ordering" && q.items) {
-            initialAnswers[q.id] = shuffleArrayWithSeed(q.items, user.id + q.id);
-          }
+          if (q.type === "ordering" && q.items) initialAnswers[q.id] = shuffleArrayWithSeed(q.items, user.id + q.id);
         });
 
         saveSession({
@@ -134,21 +118,13 @@ export function UjianClient() {
 
   useEffect(() => {
     if (!exam || !studentData || showStartPrompt || selesai) return;
-
     const sync = async () => {
       await syncActiveSession({
-        id: `${exam.id}_${studentData.id}`,
-        examId: exam.id,
-        studentId: studentData.id,
-        studentName: nama,
-        className: studentData.className,
-        currentQuestion: nomorSoal + 1,
-        totalQuestions: exam.questions.length,
-        violations: violations,
-        lastSeen: new Date().toISOString(),
+        id: `${exam.id}_${studentData.id}`, examId: exam.id, studentId: studentData.id,
+        studentName: nama, className: studentData.className, currentQuestion: nomorSoal + 1,
+        totalQuestions: exam.questions.length, violations: violations, lastSeen: new Date().toISOString(),
       });
     };
-
     sync();
     const interval = setInterval(sync, 5000);
     return () => clearInterval(interval);
@@ -156,17 +132,14 @@ export function UjianClient() {
 
   useEffect(() => {
     if (showStartPrompt || selesai) return;
-
     const disableContextMenu = (e: MouseEvent) => e.preventDefault();
     const disableCopyPaste = (e: ClipboardEvent) => e.preventDefault();
     const disableSelect = (e: Event) => e.preventDefault();
-
     document.addEventListener("contextmenu", disableContextMenu);
     document.addEventListener("copy", disableCopyPaste);
     document.addEventListener("cut", disableCopyPaste);
     document.addEventListener("paste", disableCopyPaste);
     document.addEventListener("selectstart", disableSelect);
-
     return () => {
       document.removeEventListener("contextmenu", disableContextMenu);
       document.removeEventListener("copy", disableCopyPaste);
@@ -184,18 +157,12 @@ export function UjianClient() {
     setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1200);
   }, [jawaban, exam, examId]);
 
-  // TIMER: Cek waktu global (endTime) & waktu lokal (sisaWaktu)
   useEffect(() => {
     if (!exam || showStartPrompt || selesai) return;
-    
     if (exam.endTime) {
       const now = new Date().getTime();
-      if (now > new Date(exam.endTime).getTime()) {
-        submitExam(true);
-        return;
-      }
+      if (now > new Date(exam.endTime).getTime()) { submitExam(true); return; }
     }
-
     if (sisaWaktu <= 0) { submitExam(true); return; }
     const t = setTimeout(() => setSisaWaktu(w => w - 1), 1000);
     return () => clearTimeout(t);
@@ -244,16 +211,9 @@ export function UjianClient() {
       const response = await fetch("/api/grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          examId: exam.id,
-          studentId: studentData.id,
-          answers: jawaban,
-          violations: violationsRef.current
-        })
+        body: JSON.stringify({ examId: exam.id, studentId: studentData.id, answers: jawaban, violations: violationsRef.current })
       });
-
       const result = await response.json();
-
       if (!response.ok) throw new Error(result.error || "Gagal mengirim jawaban.");
 
       localStorage.setItem("hasilUjian", JSON.stringify({
@@ -262,10 +222,8 @@ export function UjianClient() {
 
       await removeActiveSession(`${exam.id}_${studentData.id}`);
       clearSession(examId);
-      
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       router.push("/hasil");
-      
     } catch (err: any) {
       alert("Terjadi kesalahan sistem saat mengirim jawaban: " + err.message);
       setIsSubmitting(false);
@@ -274,13 +232,13 @@ export function UjianClient() {
   }
 
   if (loading || !exam) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Menyiapkan soal...</p></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-[#0B1120]"><Loader2 className="w-8 h-8 animate-spin text-amber-400" /></div>;
   }
 
   if (isSubmitting) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6">
-        <Loader2 className="w-12 h-12 animate-spin text-blue-500 mb-4" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B1120] text-white p-6">
+        <Loader2 className="w-14 h-14 animate-spin text-amber-400 mb-6" />
         <h2 className="text-2xl font-bold mb-2">Mengirim Jawaban...</h2>
         <p className="text-slate-400 text-center max-w-md">Sistem sedang menilai jawaban Anda. Jangan tutup atau refresh halaman ini.</p>
       </div>
@@ -289,22 +247,30 @@ export function UjianClient() {
 
   if (showStartPrompt) {
     return (
-      <main className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50">
-        <Card className="p-8 max-w-md w-full text-center">
-          <Lock className="w-10 h-10 text-blue-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-slate-900 mb-1">{exam.title}</h1>
-          <p className="text-sm text-slate-500 mb-6">{exam.questions.length} soal • {Math.floor(exam.duration / 60)} menit</p>
-          <div className="bg-amber-50 p-4 rounded-xl text-left text-xs text-amber-800 mb-6">
-            <p className="font-bold mb-1">Perhatian:</p>
-            <ul className="list-disc pl-4 space-y-1">
-              <li>Layar penuh wajib.</li>
-              <li>Jangan pindah tab.</li>
-              <li>Klik kanan & Copy-Paste dinonaktifkan.</li>
-              <li>Jawaban auto-save.</li>
-              <li>Ujian akan otomatis terkumpul jika waktu habis.</li>
+      <main className="min-h-screen flex items-center justify-center p-6 bg-[#0B1120] relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 w-[600px] h-[600px] bg-blue-600/20 rounded-full blur-[100px] -translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
+        
+        <Card className="p-8 max-w-lg w-full text-center bg-slate-800/80 backdrop-blur-xl border border-slate-700 shadow-2xl relative z-10">
+          <div className="w-16 h-16 rounded-full bg-slate-900/50 border border-slate-700 flex items-center justify-center mx-auto mb-6">
+            <Lock className="w-8 h-8 text-amber-400" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">{exam.title}</h1>
+          <p className="text-base text-slate-400 mb-8">{exam.questions.length} soal • {Math.floor(exam.duration / 60)} menit</p>
+          
+          <div className="bg-slate-900/50 p-5 rounded-2xl text-left text-sm text-slate-300 mb-8 border border-slate-700/50">
+            <p className="font-bold text-amber-400 mb-3 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> Perhatian Sebelum Memulai:</p>
+            <ul className="list-disc pl-5 space-y-2">
+              <li>Ujian akan berjalan dalam mode <b>Layar Penuh</b>.</li>
+              <li>Dilarang berpindah tab atau keluar dari layar ujian.</li>
+              <li>Klik kanan, blok teks, dan Copy-Paste dinonaktifkan.</li>
+              <li>Jawaban tersimpan secara otomatis (Auto-save).</li>
+              <li>Ujian akan terkumpul paksa jika waktu habis.</li>
             </ul>
           </div>
-          <Button onClick={startExam} className="w-full">Mulai Ujian</Button>
+
+          <button onClick={startExam} className="w-full inline-flex items-center justify-center font-bold rounded-xl px-6 py-4 text-lg text-slate-900 bg-amber-400 hover:bg-amber-300 transition-all shadow-[0_0_20px_rgba(251,191,36,0.2)] hover:shadow-[0_0_30px_rgba(251,191,36,0.4)]">
+            Saya Mengerti, Mulai Ujian <ArrowRight className="w-5 h-5 ml-2" />
+          </button>
         </Card>
       </main>
     );
@@ -314,41 +280,68 @@ export function UjianClient() {
   const ans = jawaban[soal.id];
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6" style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }}>
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-[#0B1120] p-4 sm:p-6 font-sans" style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }}>
+      <div className="max-w-4xl mx-auto">
+        
+        {/* Modal Peringatan Pelanggaran */}
         {showWarning && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
-            <Card className="p-6 max-w-md w-full">
-              <h3 className="font-bold text-red-600 text-lg mb-2">Pelanggaran!</h3>
-              <p className="text-sm mb-4">Anda terdeteksi keluar dari layar ujian. Total: {violations}x</p>
-              <Button onClick={() => setShowWarning(false)} className="w-full">Mengerti</Button>
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+            <Card className="p-8 max-w-md w-full bg-slate-800 border-2 border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-fade-in-up">
+              <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4 border border-red-500/30">
+                <AlertTriangle className="w-7 h-7 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-white text-center mb-2">Pelanggaran Terdeteksi!</h3>
+              <p className="text-sm text-slate-300 text-center mb-6">Anda terdeteksi keluar dari layar ujian. Tindakan ini tercatat oleh sistem.</p>
+              <div className="bg-slate-900 rounded-xl p-4 text-center mb-6 border border-slate-700">
+                <p className="text-xs text-slate-400 mb-1">Total Pelanggaran</p>
+                <p className="text-4xl font-black text-red-500">{violations}<span className="text-lg text-red-400 font-normal">x</span></p>
+              </div>
+              <button onClick={() => setShowWarning(false)} className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition">Kembali ke Ujian</button>
             </Card>
           </div>
         )}
 
-        <Card className="p-4 mb-4 flex justify-between items-center bg-white">
-          <div><p className="text-xs text-slate-500">Peserta</p><p className="font-bold">{nama}</p></div>
-          <div className="text-right"><p className="text-xs text-slate-500">Waktu</p><p className={`font-bold ${sisaWaktu < 60 ? "text-red-600 animate-pulse" : "text-blue-600"}`}>{Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}</p></div>
+        {/* Header Ujian */}
+        <Card className="p-5 mb-5 flex justify-between items-center bg-slate-800/80 backdrop-blur-md border border-slate-700 shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
+              <span className="font-black text-amber-400 text-lg">{nama.charAt(0)}</span>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Peserta Ujian</p>
+              <p className="font-bold text-white text-lg leading-tight">{nama}</p>
+            </div>
+          </div>
+          <div className="text-right bg-slate-900/50 px-4 py-2 rounded-xl border border-slate-700/50">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center justify-end gap-1"><Clock className="w-3 h-3"/> Sisa Waktu</p>
+            <p className={`font-black text-2xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-400"}`}>
+              {Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}
+            </p>
+          </div>
         </Card>
 
-        <Card className="p-6 mb-4 bg-white">
-          <div className="flex justify-between items-center mb-4">
-            <p className="text-sm font-semibold text-slate-500">Soal {nomorSoal + 1} / {exam.questions.length}</p>
-            {savedFlash && <span className="text-xs text-emerald-600">Tersimpan</span>}
+        {/* Konten Soal */}
+        <Card className="p-6 sm:p-8 mb-5 bg-slate-800/80 backdrop-blur-md border border-slate-700 shadow-xl rounded-3xl">
+          <div className="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-4">
+            <p className="text-sm font-bold text-slate-300 uppercase tracking-wider">Soal {nomorSoal + 1} <span className="text-slate-500 font-normal">dari {exam.questions.length}</span></p>
+            {savedFlash && <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fade-in-up"><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
           </div>
-          <div className="text-lg font-semibold mb-4 prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: soal.question }} />
           
-          {soal.image && <img src={soal.image} className="max-h-64 mb-4 rounded-xl border" />}
+          {/* Pertanyaan Besar */}
+          <div className="text-xl sm:text-2xl font-medium text-white mb-8 leading-relaxed" dangerouslySetInnerHTML={{ __html: soal.question }} />
+          
+          {soal.image && <img src={soal.image} className="max-h-64 mb-8 rounded-xl border border-slate-600 shadow-md" />}
 
           <div className="space-y-4">
             {soal.type === "multiple_choice" && soal.options?.map((opt, i) => {
               const identifier = opt || `Opsi ${i+1}`;
               const img = soal.optionImages?.[i];
+              const isSelected = ans === identifier;
               return (
-                <button key={i} onClick={() => updateJawaban(soal.id, identifier)} className={`w-full text-left p-3 rounded-xl border-2 flex items-center gap-3 transition ${ans === identifier ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"}`}>
-                  <span className="w-7 h-7 rounded-full bg-white border flex items-center justify-center font-bold shrink-0">{String.fromCharCode(65+i)}</span>
-                  {img && <img src={img} className="h-16 object-contain rounded border bg-white" alt={`Opsi ${i+1}`} />}
-                  <div className="font-medium prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: opt }} />
+                <button key={i} onClick={() => updateJawaban(soal.id, identifier)} className={`w-full text-left p-4 rounded-xl border-2 flex items-center gap-4 transition-all duration-200 ${isSelected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-800 hover:border-slate-500"}`}>
+                  <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 transition-colors ${isSelected ? "bg-amber-400 text-slate-900" : "bg-slate-700 text-slate-300"}`}>{String.fromCharCode(65+i)}</span>
+                  {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
+                  <div className={`text-lg prose prose-sm max-w-none prose-invert ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
                 </button>
               );
             })}
@@ -361,30 +354,33 @@ export function UjianClient() {
                 <button key={i} onClick={() => {
                   const curr = Array.isArray(ans) ? ans : [];
                   updateJawaban(soal.id, selected ? curr.filter(a => a !== identifier) : [...curr, identifier]);
-                }} className={`w-full text-left p-3 rounded-xl border-2 flex items-center gap-3 transition ${selected ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"}`}>
-                  <div className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 ${selected ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300"}`}>{selected && <CheckCircle2 className="w-4 h-4"/>}</div>
-                  {img && <img src={img} className="h-16 object-contain rounded border bg-white" alt={`Opsi ${i+1}`} />}
-                  <div className="font-medium prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: opt }} />
+                }} className={`w-full text-left p-4 rounded-xl border-2 flex items-center gap-4 transition-all duration-200 ${selected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-800 hover:border-slate-500"}`}>
+                  <div className={`w-8 h-8 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-500"}`}>{selected && <CheckCircle2 className="w-5 h-5"/>}</div>
+                  {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
+                  <div className={`text-lg prose prose-sm max-w-none prose-invert ${selected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
                 </button>
               );
             })}
 
             {soal.type === "true_false" && (
-              <div className="grid grid-cols-2 gap-3">
-                {[true, false].map(val => (
-                  <button key={String(val)} onClick={() => updateJawaban(soal.id, val)} className={`py-4 rounded-xl border-2 font-bold ${ans === val ? "border-blue-600 bg-blue-50 text-blue-700" : "border-slate-200"}`}>{val ? "Benar" : "Salah"}</button>
-                ))}
+              <div className="grid grid-cols-2 gap-4">
+                {[true, false].map(val => {
+                  const isSelected = ans === val;
+                  return (
+                    <button key={String(val)} onClick={() => updateJawaban(soal.id, val)} className={`py-6 rounded-xl border-2 font-bold text-lg transition-all duration-200 ${isSelected ? "border-amber-400 bg-amber-400/10 text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-800 text-slate-300 hover:border-slate-500"}`}>{val ? "BENAR" : "SALAH"}</button>
+                  );
+                })}
               </div>
             )}
 
             {soal.type === "multi_true_false" && soal.statements?.map((st, i) => {
               const curr = ans || {};
               return (
-                <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border rounded-xl gap-3">
-                  <div className="text-sm flex-1 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: st.text }} />
-                  <div className="flex gap-2">
-                    <button onClick={() => updateJawaban(soal.id, {...curr, [i]: true})} className={`px-4 py-2 rounded-lg border-2 text-sm font-semibold ${curr[i] === true ? "bg-emerald-50 border-emerald-500 text-emerald-700" : "border-slate-200"}`}>Benar</button>
-                    <button onClick={() => updateJawaban(soal.id, {...curr, [i]: false})} className={`px-4 py-2 rounded-lg border-2 text-sm font-semibold ${curr[i] === false ? "bg-red-50 border-red-500 text-red-700" : "border-slate-200"}`}>Salah</button>
+                <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border border-slate-600 bg-slate-800 rounded-xl gap-4">
+                  <div className="text-base text-slate-200 flex-1 prose prose-sm max-w-none prose-invert" dangerouslySetInnerHTML={{ __html: st.text }} />
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => updateJawaban(soal.id, {...curr, [i]: true})} className={`px-6 py-2.5 rounded-lg border-2 text-sm font-bold transition-all ${curr[i] === true ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>BENAR</button>
+                    <button onClick={() => updateJawaban(soal.id, {...curr, [i]: false})} className={`px-6 py-2.5 rounded-lg border-2 text-sm font-bold transition-all ${curr[i] === false ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>SALAH</button>
                   </div>
                 </div>
               );
@@ -395,9 +391,9 @@ export function UjianClient() {
                 {soal.pairs?.map((p, i) => {
                   const curr = ans || {};
                   return (
-                    <div key={i} className="flex flex-col sm:flex-row gap-2 items-center">
-                      <div className="flex-1 w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: p.left }} />
-                      <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-3 rounded-xl border-2 border-slate-200 bg-white text-sm focus:border-blue-500">
+                    <div key={i} className="flex flex-col sm:flex-row gap-3 items-center">
+                      <div className="flex-1 w-full p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-base text-slate-200 prose prose-sm max-w-none prose-invert" dangerouslySetInnerHTML={{ __html: p.left }} />
+                      <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-4 rounded-xl border-2 border-slate-600 bg-slate-800 text-base text-white focus:border-amber-400 focus:outline-none">
                         <option value="" disabled>-- Pilih Pasangan --</option>
                         {soal.pairs?.map(pr => <option key={pr.right} value={pr.right}>{pr.right.replace(/<[^>]*>?/gm, '')}</option>)}
                       </select>
@@ -408,14 +404,14 @@ export function UjianClient() {
             )}
 
             {soal.type === "ordering" && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {(ans && Array.isArray(ans) ? ans : soal.items || []).map((item, i, arr) => (
-                  <div key={i} className="flex gap-2 items-center p-2 bg-white border rounded-xl">
-                    <span className="w-6 text-center font-bold text-slate-400">{i+1}</span>
-                    <div className="flex-1 text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item }} />
+                  <div key={i} className="flex gap-3 items-center p-3 bg-slate-800 border border-slate-600 rounded-xl">
+                    <span className="w-8 text-center font-bold text-amber-400 text-lg">{i+1}</span>
+                    <div className="flex-1 text-base text-slate-200 prose prose-sm max-w-none prose-invert" dangerouslySetInnerHTML={{ __html: item }} />
                     <div className="flex flex-col gap-1">
-                      <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className="p-1 bg-slate-100 rounded hover:bg-slate-200 disabled:opacity-30">▲</button>
-                      <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className="p-1 bg-slate-100 rounded hover:bg-slate-200 disabled:opacity-30">▼</button>
+                      <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className="p-1.5 bg-slate-700 rounded text-slate-300 hover:bg-slate-600 disabled:opacity-30">▲</button>
+                      <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className="p-1.5 bg-slate-700 rounded text-slate-300 hover:bg-slate-600 disabled:opacity-30">▼</button>
                     </div>
                   </div>
                 ))}
@@ -423,35 +419,55 @@ export function UjianClient() {
             )}
 
             {soal.type === "short_answer" && (
-              <input type="text" value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban..." className="w-full p-4 border-2 rounded-xl text-lg focus:border-blue-500 focus:outline-none" />
+              <input type="text" value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban Anda..." className="w-full p-5 border-2 border-slate-600 bg-slate-900/50 rounded-xl text-xl text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none transition" />
             )}
 
             {soal.type === "essay" && (
               <div>
-                <textarea rows={6} value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban panjang Anda di sini..." className="w-full p-4 border-2 rounded-xl text-base focus:border-blue-500 focus:outline-none resize-none" />
-                <p className="text-xs text-amber-600 mt-1">Jawaban esai akan dinilai manual oleh guru.</p>
+                <textarea rows={8} value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban panjang Anda di sini..." className="w-full p-5 border-2 border-slate-600 bg-slate-900/50 rounded-xl text-base text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none resize-none transition" />
+                <p className="text-sm font-medium text-amber-500 mt-2">Jawaban esai akan dinilai manual oleh guru.</p>
               </div>
             )}
           </div>
         </Card>
 
-        <Card className="p-4 mb-4">
+        {/* Navigasi Soal */}
+        <Card className="p-5 mb-5 bg-slate-800/80 backdrop-blur-md border border-slate-700 shadow-lg rounded-2xl">
+          <p className="text-sm font-semibold text-slate-400 mb-3">Navigasi Soal:</p>
           <div className="flex flex-wrap gap-2">
             {exam.questions.map((q, i) => {
               const answered = jawaban[q.id] !== undefined && (Array.isArray(jawaban[q.id]) ? jawaban[q.id].length > 0 : jawaban[q.id] !== "");
               return (
-                <button key={q.id} onClick={() => setNomorSoal(i)} className={`w-10 h-10 rounded-lg font-bold text-sm ${i === nomorSoal ? "bg-blue-600 text-white" : answered ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{i+1}</button>
+                <button key={q.id} onClick={() => setNomorSoal(i)} className={`w-11 h-11 rounded-xl font-bold text-base transition-all ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-800 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>
               );
             })}
           </div>
         </Card>
 
-        <div className="flex justify-between gap-3">
-          <Button variant="secondary" onClick={() => setNomorSoal(n => Math.max(0, n-1))} disabled={nomorSoal===0}><ChevronLeft className="w-4 h-4 mr-1"/>Sebelumnya</Button>
+        {/* Tombol Aksi Bawah */}
+        <div className="flex justify-between gap-4 mt-8">
+          <button 
+            onClick={() => setNomorSoal(n => Math.max(0, n-1))} 
+            disabled={nomorSoal===0} 
+            className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-300 bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:opacity-30 transition flex items-center justify-center gap-2"
+          >
+            <ChevronLeft className="w-5 h-5"/> Sebelumnya
+          </button>
+          
           {nomorSoal === exam.questions.length - 1 ? (
-            <Button variant="success" onClick={() => submitExam(false)}><CheckCircle2 className="w-4 h-4 mr-1.5"/>Selesai & Kirim</Button>
+            <button 
+              onClick={() => submitExam(false)} 
+              className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.2)] transition flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 className="w-5 h-5"/> Selesai & Kirim
+            </button>
           ) : (
-            <Button onClick={() => setNomorSoal(n => Math.min(exam.questions.length-1, n+1))}>Selanjutnya<ChevronRight className="w-4 h-4 ml-1"/></Button>
+            <button 
+              onClick={() => setNomorSoal(n => Math.min(exam.questions.length-1, n+1))} 
+              className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-amber-400 hover:bg-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.2)] transition flex items-center justify-center gap-2"
+            >
+              Selanjutnya <ChevronRight className="w-5 h-5"/>
+            </button>
           )}
         </div>
       </div>
