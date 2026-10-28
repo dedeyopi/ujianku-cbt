@@ -38,35 +38,33 @@ input:-webkit-autofill {
   -webkit-box-shadow: 0 0 0 30px white inset !important;
 }
 
-/* Animasi mengapung untuk ilustrasi */
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-12px);
-  }
+/* ========================================= */
+/* KELAS SAKTI: MEMBERSIHKAN HTML DARI WORD  */
+/* ========================================= */
+
+.rich-text-content {
+  font-family: inherit !important;
+  line-height: 1.6 !important;
+  color: inherit !important;
 }
 
-.animate-float {
-  animation: float 4s ease-in-out infinite;
+.rich-text-content *:not(img) {
+  font-family: inherit !important;
+  font-size: inherit !important; /* Memaksa semua tag mengambil ukuran dari div induknya */
+  line-height: inherit !important;
+  color: inherit !important;
+  background-color: transparent !important;
+  margin-top: 0 !important;
+  margin-bottom: 0.5rem !important;
 }
 
-.animate-float-slow {
-  animation: float 6s ease-in-out infinite;
+/* Khusus untuk teks soal agar benar-benar terpaksa besar */
+.soal-pertanyaan {
+  font-size: 1.125rem !important; /* Setara text-lg (18px) untuk HP */
 }
 
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
+@media (min-width: 640px) {
+  .soal-pertanyaan {
+    font-size: 1.25rem !important; /* Setara text-xl (20px) untuk Desktop */
   }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.animate-scale-in {
-  animation: scaleIn 0.4s ease-out;
 }
