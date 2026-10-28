@@ -101,4 +101,6 @@ export type ActiveSession = {
   totalQuestions: number;
   violations: number;
   lastSeen: string;
+  startedAt: string; // <-- TAMBAHKAN INI
+  tabId: string;     // <-- TAMBAHKAN INI
 };

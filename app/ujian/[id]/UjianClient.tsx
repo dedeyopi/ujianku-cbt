@@ -67,6 +67,19 @@ export function UjianClient() {
 
   const violationsRef = useRef(0);
   const skipAutoSaveRef = useRef(true);
+  
+  // Ref untuk ID Tab Unik
+  const tabIdRef = useRef<string>("");
+
+  // Inisialisasi Tab ID menggunakan sessionStorage (hilang saat tab ditutup)
+  useEffect(() => {
+    let tid = sessionStorage.getItem("ujianku_tab_id");
+    if (!tid) {
+      tid = crypto.randomUUID();
+      sessionStorage.setItem("ujianku_tab_id", tid);
+    }
+    tabIdRef.current = tid;
+  }, []);
 
   useEffect(() => {
     async function loadExam() {
@@ -81,7 +94,48 @@ export function UjianClient() {
 
       const found = await fetchExamForStudent(examId);
       if (!found || !found.isActive) { router.push("/siswa"); return; }
+
+      // --- SINKRONISASI SESI DI SERVER ---
+      const sessionId = `${examId}_${user.id}`;
+      const tabId = tabIdRef.current;
       
+      const { data: existingSession } = await supabase.from("active_sessions").select("*").eq("id", sessionId).single();
+      
+      let startedAt = new Date().toISOString();
+
+      if (existingSession) {
+        // Cek jika perangkat lain aktif (ping < 15 detik yang lalu) dan Tab ID berbeda
+        const isOtherDeviceActive = (Date.now() - new Date(existingSession.last_seen).getTime() < 15000) && existingSession.tab_id !== tabId;
+        
+        if (isOtherDeviceActive) {
+          alert("Ujian ini sedang dikerjakan di perangkat/tab lain. Silakan tutup perangkat tersebut atau tunggu 15 detik untuk mengambil alih.");
+          router.push("/siswa");
+          return;
+        }
+
+        // Ambil waktu mulai dari server agar timer identik
+        startedAt = existingSession.started_at;
+        
+        // Ambil alih sesi (update tab_id)
+        await supabase.from("active_sessions").update({ tab_id: tabId, last_seen: new Date().toISOString() }).eq("id", sessionId);
+      } else {
+        // Buat sesi baru di server
+        await supabase.from("active_sessions").insert({
+          id: sessionId,
+          exam_id: examId,
+          student_id: user.id,
+          student_name: profile.full_name,
+          class_name: profile.class_name || "-",
+          current_question: 1,
+          total_questions: found.questions.length,
+          violations: 0,
+          last_seen: new Date().toISOString(),
+          started_at: startedAt,
+          tab_id: tabId
+        });
+      }
+      // ------------------------------------
+
       const randomizedExam = getRandomizedExam(found, user.id);
       setExam(randomizedExam);
       setNama(profile.full_name);
@@ -92,7 +146,9 @@ export function UjianClient() {
         setJawaban(existing.answers);
         setViolations(existing.violations);
         violationsRef.current = existing.violations;
-        const elapsed = Math.floor((Date.now() - new Date(existing.startedAt).getTime()) / 1000);
+        
+        // Gunakan startedAt dari server
+        const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
         const sisa = Math.max(0, found.duration - elapsed);
         setSisaWaktu(sisa);
         setIsResume(true);
@@ -105,24 +161,33 @@ export function UjianClient() {
 
         saveSession({
           examId, studentId: user.id, studentName: profile.full_name,
-          answers: initialAnswers, startedAt: new Date().toISOString(), violations: 0, lastUpdated: new Date().toISOString()
+          answers: initialAnswers, startedAt: startedAt, violations: 0, lastUpdated: new Date().toISOString()
         });
         setJawaban(initialAnswers);
-        setSisaWaktu(found.duration);
+        
+        const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+        const sisa = Math.max(0, found.duration - elapsed);
+        setSisaWaktu(sisa);
       }
       setLoading(false);
     }
     loadExam();
   }, [examId, router]);
 
+  // SINKRONISASI PING KE SERVER
   useEffect(() => {
     if (!exam || !studentData || showStartPrompt || selesai) return;
     const sync = async () => {
-      await syncActiveSession({
-        id: `${exam.id}_${studentData.id}`, examId: exam.id, studentId: studentData.id,
-        studentName: nama, className: studentData.className, currentQuestion: nomorSoal + 1,
-        totalQuestions: exam.questions.length, violations: violations, lastSeen: new Date().toISOString(),
-      });
+      const success = await syncActiveSession(
+        `${exam.id}_${studentData.id}`,
+        tabIdRef.current,
+        nomorSoal + 1,
+        violations
+      );
+      if (!success) {
+        alert("Sesi ujian Anda telah berakhir (kemungkinan dikumpulkan di perangkat lain).");
+        router.push("/siswa");
+      }
     };
     sync();
     const interval = setInterval(sync, 5000);
@@ -369,7 +434,7 @@ export function UjianClient() {
               {savedFlash && <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fade-in-up"><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
             </div>
             
-            {/* PERTANYAAN SOAL: Memaksa warna putih terang */}
+            {/* PERTANYAAN SOAL */}
             <div 
               className="rich-text-content soal-pertanyaan font-medium text-white mb-10 shrink-0 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
               dangerouslySetInnerHTML={{ __html: soal.question }} 
@@ -428,7 +493,6 @@ export function UjianClient() {
                 const curr = ans || {};
                 return (
                   <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 border-2 border-slate-600 bg-slate-900/50 rounded-2xl gap-4">
-                    {/* PERNYATAAN B/S BERTINGKAT: Memaksa warna putih terang */}
                     <div 
                       className="rich-text-content text-base sm:text-lg text-slate-200 flex-1 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
                       dangerouslySetInnerHTML={{ __html: st.text }} 
