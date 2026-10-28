@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { GraduationCap, ArrowRight, AlertCircle, User, Sparkles, Lock } from "lucide-react";
-import { Card } from "../../components/Card";
 import { loginStudent } from "../../lib/auth";
 
 export default function LoginSiswaPage() {
@@ -42,7 +41,7 @@ export default function LoginSiswaPage() {
 
       <div className="w-full max-w-md relative animate-fade-in-up z-10">
         {/* Brand */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/20 flex items-center justify-center">
               <Sparkles className="w-7 h-7 text-white" />
@@ -55,15 +54,16 @@ export default function LoginSiswaPage() {
         </div>
 
         <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700 text-slate-300 text-sm font-semibold backdrop-blur-sm">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 text-sm font-semibold backdrop-blur-sm shadow-sm">
             <GraduationCap className="w-4 h-4 text-amber-400" /> Portal Siswa
           </div>
         </div>
 
-        <Card className="p-8 bg-slate-800/80 backdrop-blur-xl border border-slate-700 shadow-2xl rounded-3xl">
+        {/* KARTU LOGIN GELAP (Clean & Glassmorphism) */}
+        <div className="p-8 bg-slate-800/90 backdrop-blur-xl border border-slate-700 shadow-2xl rounded-3xl">
           <div className="space-y-5">
             <div>
-              <label className="block text-base font-semibold text-slate-300 mb-2">Username</label>
+              <label className="block text-sm font-semibold text-slate-300 mb-2">Username</label>
               <div className="relative">
                 <User className="w-5 h-5 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
@@ -80,7 +80,7 @@ export default function LoginSiswaPage() {
             </div>
 
             <div>
-              <label className="block text-base font-semibold text-slate-300 mb-2">Kata Sandi</label>
+              <label className="block text-sm font-semibold text-slate-300 mb-2">Kata Sandi</label>
               <div className="relative">
                 <Lock className="w-5 h-5 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
@@ -109,7 +109,7 @@ export default function LoginSiswaPage() {
           >
             {loading ? "Memeriksa..." : "Masuk ke Ujian"} <ArrowRight className="w-5 h-5 ml-2" />
           </button>
-        </Card>
+        </div>
 
         <div className="text-center mt-8">
           <a href="/" className="text-sm font-medium text-slate-500 hover:text-white transition flex items-center justify-center gap-2">
