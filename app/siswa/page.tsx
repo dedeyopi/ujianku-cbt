@@ -113,15 +113,15 @@ export default function SiswaPage() {
 
       <div className="max-w-5xl mx-auto px-6 pt-10 relative z-10">
         
-        {/* Kartu Sambutan (Welcome Card) */}
-        <Card className="p-10 mb-10 bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-2xl rounded-3xl relative overflow-hidden">
+        {/* Kartu Sambutan (Welcome Card) - Menggunakan div biasa agar tidak bentrok dengan bg-white bawaan Card */}
+        <div className="p-10 mb-10 bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-2xl rounded-3xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
           <p className="text-lg font-medium text-slate-400 mb-2">Selamat datang kembali,</p>
           <h2 className="text-4xl sm:text-5xl font-black text-white mb-4">{student.fullName}</h2>
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-400/10 border border-amber-400/20 text-amber-400 text-base font-bold">
             <GraduationCap className="w-5 h-5" /> Kelas {student.className}
           </div>
-        </Card>
+        </div>
 
         {/* Tab Navigasi */}
         <div className="flex gap-2 mb-8 bg-slate-900/50 p-2 rounded-2xl w-fit border border-slate-800">
@@ -142,52 +142,56 @@ export default function SiswaPage() {
         {/* Konten Tab */}
         {activeTab === "tersedia" ? (
           exams.length === 0 ? (
-            <Card className="p-16 text-center bg-slate-800/50 border border-slate-700 rounded-3xl">
+            <div className="p-16 text-center bg-slate-800/50 border border-slate-700 rounded-3xl">
               <BookOpen className="w-14 h-14 text-slate-600 mx-auto mb-4" />
               <p className="text-2xl font-bold text-slate-300 mb-2">Belum ada ujian aktif</p>
-              <p className="text-base text-slate-500">Tunggu guru Anda mengaktifkan ujian.</p>
-            </Card>
+              <p className="text-base text-slate-400">Tunggu guru Anda mengaktifkan ujian.</p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {exams.map((exam) => {
                 const existingResult = getResultForExam(exam.id);
                 return (
-                  <Card key={exam.id} className={`p-8 bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-3xl shadow-lg transition-all duration-200 ${existingResult ? 'opacity-70' : 'hover:border-slate-500 hover:shadow-xl hover:-translate-y-1'}`}>
-                    <h4 className="text-2xl font-bold text-white mb-2 truncate">{exam.title}</h4>
-                    <p className="text-base font-medium text-slate-400 mb-6">{exam.subject}</p>
-                    
-                    <div className="flex flex-wrap items-center gap-5 text-base text-slate-400 mb-8 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-                      <span className="inline-flex items-center gap-2"><BookOpen className="w-5 h-5 text-blue-400" /> {exam.questions.length} Soal</span>
-                      <span className="inline-flex items-center gap-2"><Clock className="w-5 h-5 text-emerald-400" /> {Math.floor(exam.duration / 60)} Menit</span>
-                      {exam.token && <span className="inline-flex items-center gap-2 text-amber-400 font-semibold"><Key className="w-5 h-5" /> Pakai Token</span>}
+                  // Menggunakan div biasa untuk menjamin background gelap
+                  <div key={exam.id} className={`p-8 bg-slate-800 backdrop-blur-sm border border-slate-700 rounded-3xl shadow-lg transition-all duration-200 flex flex-col ${existingResult ? 'opacity-80' : 'hover:border-slate-500 hover:shadow-2xl hover:-translate-y-1'}`}>
+                    <div className="flex-1">
+                      <h4 className="text-2xl font-bold text-white mb-2">{exam.title}</h4>
+                      {/* Warna teks mapel dibuat lebih terang (slate-300) agar kontras dengan latar gelap */}
+                      <p className="text-base font-medium text-slate-300 mb-6">{exam.subject}</p>
+                      
+                      <div className="flex flex-wrap items-center gap-5 text-base text-slate-300 mb-8 bg-slate-900/80 p-4 rounded-xl border border-slate-700">
+                        <span className="inline-flex items-center gap-2"><BookOpen className="w-5 h-5 text-blue-400" /> {exam.questions.length} Soal</span>
+                        <span className="inline-flex items-center gap-2"><Clock className="w-5 h-5 text-emerald-400" /> {Math.floor(exam.duration / 60)} Menit</span>
+                        {exam.token && <span className="inline-flex items-center gap-2 text-amber-400 font-semibold"><Key className="w-5 h-5" /> Pakai Token</span>}
+                      </div>
                     </div>
                     
                     {existingResult ? (
                       <div className="w-full py-4 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center gap-2 font-bold text-lg border border-emerald-500/20">
-                        <CheckCircle2 className="w-6 h-6" /> Sudah Dikerjakan (Nilai: {existingResult.score})
+                        <CheckCircle2 className="w-6 h-6" /> Selesai (Nilai: {existingResult.score})
                       </div>
                     ) : (
                       <button onClick={() => handleMulaiUjian(exam)} className="w-full py-4 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-xl font-bold text-lg transition-all shadow-[0_0_15px_rgba(251,191,36,0.2)] hover:shadow-[0_0_25px_rgba(251,191,36,0.4)] flex items-center justify-center gap-2">
                         Mulai Ujian <ArrowRight className="w-6 h-6" />
                       </button>
                     )}
-                  </Card>
+                  </div>
                 );
               })}
             </div>
           )
         ) : (
           history.length === 0 ? (
-            <Card className="p-16 text-center bg-slate-800/50 border border-slate-700 rounded-3xl">
+            <div className="p-16 text-center bg-slate-800/50 border border-slate-700 rounded-3xl">
               <History className="w-14 h-14 text-slate-600 mx-auto mb-4" />
               <p className="text-2xl font-bold text-slate-300 mb-2">Belum ada riwayat</p>
-              <p className="text-base text-slate-500">Anda belum pernah mengerjakan ujian.</p>
-            </Card>
+              <p className="text-base text-slate-400">Anda belum pernah mengerjakan ujian.</p>
+            </div>
           ) : (
-            <Card className="overflow-hidden bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-3xl shadow-xl">
+            <div className="overflow-hidden bg-slate-800 border border-slate-700 rounded-3xl shadow-xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-base text-left">
-                  <thead className="bg-slate-900/80 border-b border-slate-700 text-slate-400 font-bold text-sm uppercase tracking-wider">
+                  <thead className="bg-slate-900 border-b border-slate-700 text-slate-300 font-bold text-sm uppercase tracking-wider">
                     <tr>
                       <th className="px-8 py-5">Nama Ujian</th>
                       <th className="px-8 py-5 text-center">Tanggal</th>
@@ -196,9 +200,9 @@ export default function SiswaPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-700/50">
                     {history.map((h) => (
-                      <tr key={h.id} className="hover:bg-slate-800/50 transition">
+                      <tr key={h.id} className="hover:bg-slate-700/50 transition">
                         <td className="px-8 py-5 font-bold text-white text-lg">{h.examTitle}</td>
-                        <td className="px-8 py-5 text-center text-slate-400 font-medium">{new Date(h.submittedAt).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                        <td className="px-8 py-5 text-center text-slate-300 font-medium">{new Date(h.submittedAt).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}</td>
                         <td className="px-8 py-5 text-center">
                           <span className={`inline-flex items-center justify-center w-14 h-12 rounded-xl font-black text-xl ${h.score >= 75 ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : h.score >= 60 ? "bg-amber-400/20 text-amber-400 border border-amber-400/30" : "bg-red-500/20 text-red-400 border border-red-500/30"}`}>
                             {h.score}
@@ -209,7 +213,7 @@ export default function SiswaPage() {
                   </tbody>
                 </table>
               </div>
-            </Card>
+            </div>
           )
         )}
       </div>
@@ -217,7 +221,7 @@ export default function SiswaPage() {
       {/* MODAL TOKEN */}
       {tokenModalOpen && selectedExamForToken && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md p-10 text-center animate-fade-in-up bg-slate-800 border border-slate-700 shadow-2xl rounded-3xl">
+          <div className="w-full max-w-md p-10 text-center animate-fade-in-up bg-slate-800 border border-slate-700 shadow-2xl rounded-3xl">
             <div className="w-20 h-20 bg-slate-900 border border-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
               <Key className="w-10 h-10 text-amber-400" />
             </div>
@@ -238,7 +242,7 @@ export default function SiswaPage() {
               <button onClick={() => setTokenModalOpen(false)} className="flex-1 py-4 bg-slate-700 hover:bg-slate-600 text-white font-bold text-lg rounded-xl transition">Batal</button>
               <button onClick={submitToken} className="flex-1 py-4 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(251,191,36,0.2)]">Masuk</button>
             </div>
-          </Card>
+          </div>
         </div>
       )}
     </main>
