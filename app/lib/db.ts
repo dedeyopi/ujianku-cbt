@@ -178,7 +178,6 @@ export async function removeActiveSession(sessionId: string): Promise<void> {
 }
 
 // --- FUNGSI BANK SOAL ---
-
 export async function fetchBankQuestions(): Promise<Question[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
@@ -186,8 +185,8 @@ export async function fetchBankQuestions(): Promise<Question[]> {
   const { data, error } = await supabase
     .from("questions")
     .select("*")
-    .is("exam_id", null) // Hanya yang tidak terikat ujian
-    .eq("owner_id", user.id) // Hanya milik guru yang login
+    .is("exam_id", null) 
+    .eq("owner_id", user.id) 
     .order("subject", { ascending: true });
 
   if (error) return [];
@@ -199,7 +198,7 @@ export async function saveQuestionToBank(q: Question, subject: string): Promise<
   if (!user) return false;
 
   const dbQ = {
-    id: crypto.randomUUID(), // ID baru untuk bank
+    id: crypto.randomUUID(),
     exam_id: null,
     owner_id: user.id,
     subject: subject,
@@ -208,6 +207,7 @@ export async function saveQuestionToBank(q: Question, subject: string): Promise<
     image_url: q.image,
     options: q.options || null,
     option_images: q.optionImages || null,
+    order_index: 0, // <-- TAMBAHKAN INI UNTUK MENGATASI ERROR NOT NULL
     correct_answer: {
       correctAnswer: q.correctAnswer, correctAnswers: q.correctAnswers, trueFalseAnswer: q.trueFalseAnswer,
       statements: q.statements, pairs: q.pairs, items: q.items, acceptedAnswers: q.acceptedAnswers,
@@ -215,7 +215,12 @@ export async function saveQuestionToBank(q: Question, subject: string): Promise<
   };
 
   const { error } = await supabase.from("questions").insert(dbQ);
-  return !error;
+  
+  if (error) {
+    console.error("Error saving to bank:", error.message); // Log error agar ketahuan jika ada masalah lain
+    return false;
+  }
+  return true;
 }
 
 export async function deleteBankQuestion(id: string): Promise<boolean> {
