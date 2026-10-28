@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Maximize, Lock, Loader2, Clock } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Maximize, Lock, Loader2, Clock, ArrowRight } from "lucide-react";
 import { Card } from "../../components/Card";
 import { supabase } from "../../lib/supabase";
 import { getSession, saveSession, clearSession } from "../../lib/session";
