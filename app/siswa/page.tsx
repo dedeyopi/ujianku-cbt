@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, BookOpen, Clock, LogOut, ArrowRight, History, Trophy, AlertTriangle } from "lucide-react";
+import { GraduationCap, BookOpen, Clock, LogOut, ArrowRight, History, Trophy, CheckCircle2 } from "lucide-react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { fetchExams, fetchStudentResults } from "../lib/db"; 
@@ -46,6 +46,11 @@ export default function SiswaPage() {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Memuat...</p></div>;
   }
 
+  // Cek apakah ujian sudah pernah dikerjakan
+  const getResultForExam = (examId: string) => {
+    return history.find(h => h.examId === examId);
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
       <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-10">
@@ -84,19 +89,28 @@ export default function SiswaPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {exams.map((exam) => (
-                <Card key={exam.id} className="p-5">
-                  <h4 className="font-semibold text-slate-900 mb-1 truncate">{exam.title}</h4>
-                  <p className="text-xs text-slate-500 mb-3">{exam.subject}</p>
-                  <div className="flex items-center gap-4 text-xs text-slate-500 mb-4">
-                    <span className="inline-flex items-center gap-1"><BookOpen className="w-3.5 h-3.5" />{exam.questions.length} soal</span>
-                    <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{Math.floor(exam.duration / 60)} menit</span>
-                  </div>
-                  <Button onClick={() => router.push(`/ujian/${exam.id}`)} size="sm" className="w-full">
-                    Mulai Ujian <ArrowRight className="w-4 h-4 ml-1.5" />
-                  </Button>
-                </Card>
-              ))}
+              {exams.map((exam) => {
+                const existingResult = getResultForExam(exam.id);
+                return (
+                  <Card key={exam.id} className={`p-5 ${existingResult ? 'bg-slate-50 opacity-90' : ''}`}>
+                    <h4 className="font-semibold text-slate-900 mb-1 truncate">{exam.title}</h4>
+                    <p className="text-xs text-slate-500 mb-3">{exam.subject}</p>
+                    <div className="flex items-center gap-4 text-xs text-slate-500 mb-4">
+                      <span className="inline-flex items-center gap-1"><BookOpen className="w-3.5 h-3.5" />{exam.questions.length} soal</span>
+                      <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{Math.floor(exam.duration / 60)} menit</span>
+                    </div>
+                    {existingResult ? (
+                      <div className="w-full py-2 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center gap-2 font-semibold text-sm border border-emerald-100">
+                        <CheckCircle2 className="w-4 h-4" /> Selesai (Nilai: {existingResult.score})
+                      </div>
+                    ) : (
+                      <Button onClick={() => router.push(`/ujian/${exam.id}`)} size="sm" className="w-full">
+                        Mulai Ujian <ArrowRight className="w-4 h-4 ml-1.5" />
+                      </Button>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           )
         ) : (
@@ -115,7 +129,6 @@ export default function SiswaPage() {
                       <th className="px-4 py-3">Nama Ujian</th>
                       <th className="px-4 py-3 text-center">Tanggal</th>
                       <th className="px-4 py-3 text-center">Nilai</th>
-                      <th className="px-4 py-3 text-center">Pelanggaran</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -125,9 +138,6 @@ export default function SiswaPage() {
                         <td className="px-4 py-3 text-center text-slate-500">{new Date(h.submittedAt).toLocaleDateString("id-ID")}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-block px-2.5 py-1 rounded-md font-bold text-xs ${h.score >= 75 ? "bg-emerald-100 text-emerald-700" : h.score >= 60 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{h.score}</span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {h.violations > 0 ? <span className="text-red-500 font-bold">{h.violations}x</span> : <span className="text-slate-300">-</span>}
                         </td>
                       </tr>
                     ))}
