@@ -45,14 +45,13 @@ input:-webkit-autofill {
 .rich-text-content {
   font-family: inherit !important;
   line-height: 1.6 !important;
-  color: inherit !important;
 }
 
 .rich-text-content *:not(img) {
   font-family: inherit !important;
-  font-size: inherit !important; /* Memaksa semua tag mengambil ukuran dari div induknya */
+  font-size: inherit !important; 
   line-height: inherit !important;
-  color: inherit !important;
+  color: inherit !important; 
   background-color: transparent !important;
   margin-top: 0 !important;
   margin-bottom: 0.5rem !important;

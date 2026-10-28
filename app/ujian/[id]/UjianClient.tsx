@@ -369,9 +369,9 @@ export function UjianClient() {
               {savedFlash && <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fade-in-up"><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
             </div>
             
-            {/* PERTANYAAN SOAL - INI BAGIAN YANG DIPERBAIKI */}
+            {/* PERTANYAAN SOAL: Memaksa warna putih terang */}
             <div 
-              className="rich-text-content soal-pertanyaan font-medium text-white mb-10 shrink-0" 
+              className="rich-text-content soal-pertanyaan font-medium text-white mb-10 shrink-0 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
               dangerouslySetInnerHTML={{ __html: soal.question }} 
             />
             
@@ -387,7 +387,7 @@ export function UjianClient() {
                     <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 transition-colors ${isSelected ? "bg-amber-400 text-slate-900" : "bg-slate-700 text-slate-300"}`}>{String.fromCharCode(65+i)}</span>
                     {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
                     <div 
-                      className={`rich-text-content text-lg sm:text-xl ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} 
+                      className={`rich-text-content text-lg sm:text-xl prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} 
                       dangerouslySetInnerHTML={{ __html: opt }} 
                     />
                   </button>
@@ -406,7 +406,7 @@ export function UjianClient() {
                     <div className={`w-8 h-8 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-500"}`}>{selected && <CheckCircle2 className="w-5 h-5"/>}</div>
                     {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
                     <div 
-                      className={`rich-text-content text-lg sm:text-xl ${selected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} 
+                      className={`rich-text-content text-lg sm:text-xl prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${selected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} 
                       dangerouslySetInnerHTML={{ __html: opt }} 
                     />
                   </button>
@@ -428,8 +428,9 @@ export function UjianClient() {
                 const curr = ans || {};
                 return (
                   <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 border-2 border-slate-600 bg-slate-900/50 rounded-2xl gap-4">
+                    {/* PERNYATAAN B/S BERTINGKAT: Memaksa warna putih terang */}
                     <div 
-                      className="rich-text-content text-base sm:text-lg text-slate-200 flex-1" 
+                      className="rich-text-content text-base sm:text-lg text-slate-200 flex-1 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
                       dangerouslySetInnerHTML={{ __html: st.text }} 
                     />
                     <div className="flex gap-2 shrink-0">
@@ -447,7 +448,7 @@ export function UjianClient() {
                     return (
                       <div key={i} className="flex flex-col sm:flex-row gap-4 items-center">
                         <div 
-                          className="rich-text-content flex-1 w-full p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl text-base text-slate-200" 
+                          className="rich-text-content flex-1 w-full p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl text-base text-slate-200 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
                           dangerouslySetInnerHTML={{ __html: p.left }} 
                         />
                         <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-4 rounded-xl border-2 border-slate-600 bg-slate-800 text-base text-white focus:border-amber-400 focus:outline-none">
@@ -466,7 +467,7 @@ export function UjianClient() {
                     <div key={i} className="flex gap-4 items-center p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl">
                       <span className="w-8 text-center font-bold text-amber-400 text-lg">{i+1}</span>
                       <div 
-                        className="rich-text-content flex-1 text-base text-slate-200" 
+                        className="rich-text-content flex-1 text-base text-slate-200 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
                         dangerouslySetInnerHTML={{ __html: item }} 
                       />
                       <div className="flex flex-col gap-1">
