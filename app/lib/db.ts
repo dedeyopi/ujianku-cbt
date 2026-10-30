@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Exam, Question, ExamResult, ActiveSession } from "./types";
+import type { Exam, Question, ExamResult, ActiveSession, AppSettings } from "./types";
 
 function safeParse(json: any) {
   if (typeof json === 'string') {
@@ -174,7 +174,7 @@ export async function syncActiveSession(
     return false;
   }
   if (!data || data.length === 0) {
-    return false; // Sesi terhapus atau diambil alih perangkat lain
+    return false;
   }
   return true;
 }
@@ -199,7 +199,6 @@ export async function fetchBankQuestions(): Promise<Question[]> {
   return data.map(mapDbQuestionToQuestion);
 }
 
-// Simpan Satu Soal
 export async function saveQuestionToBank(q: Question, subject: string, topic: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
@@ -218,7 +217,6 @@ export async function saveQuestionToBank(q: Question, subject: string, topic: st
   return !error;
 }
 
-// Simpan Banyak Soal (Bulk)
 export async function bulkSaveToBank(questions: Question[], subject: string, topic: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
