@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
@@ -10,7 +10,22 @@ import {
 } from "lucide-react";
 import { logout } from "../lib/auth";
 
+// 1. Komponen Utama dibungkus dengan Suspense
 export default function GuruLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center text-white">
+        <ShieldCheck className="w-12 h-12 text-blue-500 animate-pulse mb-4" />
+        <p className="font-medium text-slate-400">Memuat Panel Guru...</p>
+      </div>
+    }>
+      <GuruLayoutContent>{children}</GuruLayoutContent>
+    </Suspense>
+  );
+}
+
+// 2. Komponen Konten ditaruh di sini (bisa menggunakan usePathname)
+function GuruLayoutContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
