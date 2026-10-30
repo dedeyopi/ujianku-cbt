@@ -241,3 +241,25 @@ export async function deleteBankQuestion(id: string): Promise<boolean> {
   const { error } = await supabase.from("questions").delete().eq("id", id);
   return !error;
 }
+
+// --- FUNGSI PENGATURAN SEKOLAH ---
+export async function fetchAppSettings(): Promise<AppSettings> {
+  const { data } = await supabase.from("app_settings").select("*").eq("id", 1).single();
+  return {
+    schoolName: data?.school_name || "Nama Sekolah",
+    schoolLogoUrl: data?.school_logo_url || null,
+  };
+}
+
+export async function updateAppSettings(schoolName: string, schoolLogoUrl: string | null): Promise<boolean> {
+  const { error } = await supabase
+    .from("app_settings")
+    .update({ school_name: schoolName, school_logo_url: schoolLogoUrl })
+    .eq("id", 1);
+  
+  if (error) {
+    console.error("Gagal update pengaturan:", error);
+    return false;
+  }
+  return true;
+}

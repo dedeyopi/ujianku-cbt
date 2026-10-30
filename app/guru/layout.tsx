@@ -1,15 +1,16 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
   Menu, Home, BookMarked, FileText, Trophy, PieChart, 
-  Database, ShieldCheck, Activity, LogOut, Sun, Maximize, User
+  Database, ShieldCheck, Activity, LogOut, Sun, Maximize, User, Settings
 } from "lucide-react";
 import { logout } from "../lib/auth";
+import { fetchAppSettings } from "../lib/db";
+import type { AppSettings } from "../lib/types";
 
-// 1. Komponen Utama dibungkus dengan Suspense
 export default function GuruLayout({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={
@@ -23,28 +24,37 @@ export default function GuruLayout({ children }: { children: React.ReactNode }) 
   );
 }
 
-// 2. Komponen Konten ditaruh di sini (bisa menggunakan usePathname)
 function GuruLayoutContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   const pathname = usePathname();
   const router = useRouter();
 
+  useEffect(() => {
+    async function loadSettings() {
+      const data = await fetchAppSettings();
+      setSettings(data);
+    }
+    loadSettings();
+  }, []);
+
   async function handleLogout() {
     await logout();
-    router.push("/login-guru"); // <-- Diarahkan ke /login-guru
+    router.push("/login-guru");
   }
 
   const menuItems = [
     { name: "Dashboard", icon: Home, path: "/guru" },
     { name: "Bank Soal", icon: BookMarked, path: "/guru/bank-soal" },
-    { name: "Ujian", icon: FileText, path: "/guru/ujian" }, // <-- Sudah diperbaiki
+    { name: "Ujian", icon: FileText, path: "/guru/ujian" },
     { name: "Hasil Ujian", icon: Trophy, path: "/guru/hasil" },
-    { name: "Analisis Soal", icon: PieChart, path: "/guru/hasil" }, // <-- Diarahkan ke hasil (karena tab analisis ada di sana)
+    { name: "Analisis Soal", icon: PieChart, path: "/guru/hasil" },
   ];
 
   const adminItems = [
     { name: "Data Siswa", icon: Database, path: "/guru/siswa" },
     { name: "Live Monitor", icon: Activity, path: "/guru/pantau" },
+    { name: "Pengaturan", icon: Settings, path: "/guru/pengaturan" },
   ];
 
   return (
@@ -54,10 +64,16 @@ function GuruLayoutContent({ children }: { children: React.ReactNode }) {
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#0f172a] text-slate-300 transform transition-transform duration-300 lg:relative lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} flex flex-col`}>
         <div className="h-16 flex items-center px-6 border-b border-slate-800 bg-[#0f172a]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-black text-white tracking-tight">UjianKu</span>
+            {settings?.schoolLogoUrl ? (
+              <img src={settings.schoolLogoUrl} alt="Logo" className="w-8 h-8 object-contain" />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5 text-white" />
+              </div>
+            )}
+            <span className="text-lg font-black text-white tracking-tight truncate">
+              {settings?.schoolName || "UjianKu"}
+            </span>
           </div>
         </div>
 
@@ -100,7 +116,6 @@ function GuruLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* OVERLAY UNTUK MOBILE */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)}></div>
       )}
@@ -108,13 +123,15 @@ function GuruLayoutContent({ children }: { children: React.ReactNode }) {
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0">
         
-        {/* HEADER */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 z-30">
           <div className="flex items-center gap-4">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
               <Menu className="w-6 h-6" />
             </button>
-            <h2 className="text-lg font-bold text-slate-800 hidden sm:block">APLIKASI CBT</h2>
+            {/* Nama Sekolah di Header */}
+            <h2 className="text-lg font-bold text-slate-800 hidden sm:block uppercase tracking-wide">
+              {settings?.schoolName || "APLIKASI CBT"}
+            </h2>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
@@ -126,14 +143,13 @@ function GuruLayoutContent({ children }: { children: React.ReactNode }) {
                 <User className="w-5 h-5" />
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-sm font-bold text-slate-800 leading-tight">Admin</p>
-                <p className="text-xs text-slate-500 leading-tight">admin@ujianku.com</p>
+                <p className="text-sm font-bold text-slate-800 leading-tight">Guru Admin</p>
+                <p className="text-xs text-slate-500 leading-tight">Pengelola Ujian</p>
               </div>
             </div>
           </div>
         </header>
 
-        {/* PAGE CONTENT */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {children}
         </main>

@@ -104,3 +104,8 @@ export type ActiveSession = {
   startedAt: string; // <-- TAMBAHKAN INI
   tabId: string;     // <-- TAMBAHKAN INI
 };
+
+export type AppSettings = {
+  schoolName: string;
+  schoolLogoUrl: string | null;
+};
