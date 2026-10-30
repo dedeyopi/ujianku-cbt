@@ -7,8 +7,8 @@ export default function Page() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-100">
-          <p className="text-sm text-slate-500">Memuat editor...</p>
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+          <p className="text-sm text-slate-500 animate-pulse">Memuat editor ujian...</p>
         </div>
       }
     >
