@@ -1,18 +1,9 @@
-import { Suspense } from "react";
 import { EditExamClient } from "./EditExamClient";
 
-export const instant = false;
-
-export default function Page() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-          <p className="text-sm text-slate-500 animate-pulse">Memuat editor ujian...</p>
-        </div>
-      }
-    >
-      <EditExamClient />
-    </Suspense>
-  );
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  // Menunggu params dari Next.js (Standar Next.js 15/16)
+  const { id } = await params;
+  
+  // Melewatkan ID langsung ke komponen client
+  return <EditExamClient examId={id} />;
 }
