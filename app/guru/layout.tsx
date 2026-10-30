@@ -60,18 +60,18 @@ function GuruLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
       
-      {/* SIDEBAR */}
+      {/* SIDEBAR (Identitas Sekolah) */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#0f172a] text-slate-300 transform transition-transform duration-300 lg:relative lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} flex flex-col`}>
         <div className="h-16 flex items-center px-6 border-b border-slate-800 bg-[#0f172a]">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 w-full">
             {settings?.schoolLogoUrl ? (
-              <img src={settings.schoolLogoUrl} alt="Logo" className="w-8 h-8 object-contain" />
+              <img src={settings.schoolLogoUrl} alt="Logo" className="w-8 h-8 object-contain shrink-0" />
             ) : (
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
                 <ShieldCheck className="w-5 h-5 text-white" />
               </div>
             )}
-            <span className="text-lg font-black text-white tracking-tight truncate">
+            <span className="text-sm font-black text-white tracking-tight truncate">
               {settings?.schoolName || "UjianKu"}
             </span>
           </div>
@@ -123,14 +123,16 @@ function GuruLayoutContent({ children }: { children: React.ReactNode }) {
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0">
         
+        {/* HEADER (Identitas Aplikasi) */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 z-30">
           <div className="flex items-center gap-4">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
               <Menu className="w-6 h-6" />
             </button>
-            {/* Nama Sekolah di Header */}
+            
+            {/* Teks UjianKu - CBT di Header */}
             <h2 className="text-lg font-bold text-slate-800 hidden sm:block uppercase tracking-wide">
-              {settings?.schoolName || "APLIKASI CBT"}
+              UjianKu - CBT
             </h2>
           </div>
 
@@ -150,6 +152,7 @@ function GuruLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
+        {/* PAGE CONTENT */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {children}
         </main>
