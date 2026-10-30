@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import {
-  Sparkles,
   ArrowRight,
   ShieldCheck,
   Zap,
@@ -36,10 +35,10 @@ export default function HomePage() {
       ></div>
 
       <div className="relative max-w-7xl mx-auto px-6 py-12 lg:py-20 w-full z-10">
-        <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+        <div className="grid lg:grid-cols-2 gap-16 lg:gap-8 items-center">
           
-          {/* --- KOLOM KIRI: TEKS & BRANDING --- */}
-          <div className="lg:col-span-5 text-center lg:text-left animate-fade-in-up">
+          {/* --- KOLOM KIRI: TEKS & BRANDING (Z-INDEX TINGGI AGAR TIDAK TERTUTUP) --- */}
+          <div className="relative z-20 text-center lg:text-left animate-fade-in-up">
             
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-900/30 border border-blue-700/50 text-amber-400 text-sm font-semibold mb-8 backdrop-blur-sm">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
@@ -90,85 +89,100 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* --- KOLOM KANAN: MOCKUP 3D (DIPERBESAR) --- */}
-          <div className="lg:col-span-7 relative flex justify-center items-center mt-16 lg:mt-0 perspective-1000">
+          {/* --- KOLOM KANAN: MOCKUP 3D --- */}
+          <div className="relative z-10 flex justify-center items-center mt-16 lg:mt-0 perspective-1000">
             
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/20 rounded-full blur-3xl"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl"></div>
 
-            {/* Komposisi Ilustrasi (Diperbesar) */}
-            <div className="relative w-full max-w-2xl">
+            {/* Container Ilustrasi */}
+            <div className="relative w-full max-w-lg">
               
               {/* 1. ELEMEN MELAYANG: Kartu Nilai (Kiri Atas) */}
-              <div className="absolute -top-16 -left-10 lg:-left-20 bg-slate-800/90 backdrop-blur-xl border border-slate-600 p-5 rounded-2xl shadow-2xl animate-float z-30 w-48 transform -rotate-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Nilai Akhir</span>
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <div className="absolute -top-12 -left-6 lg:-left-12 bg-slate-800/90 backdrop-blur-xl border border-slate-600 p-4 rounded-2xl shadow-2xl animate-float z-30 w-40 transform -rotate-6">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nilai Akhir</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 </div>
-                <div className="text-4xl font-black text-white">98<span className="text-sm text-slate-500 font-normal">/100</span></div>
-                <div className="w-full bg-slate-700 h-2 rounded-full mt-3">
-                  <div className="bg-emerald-400 h-2 rounded-full" style={{ width: '98%' }}></div>
-                </div>
-              </div>
-
-              {/* 2. ELEMEN MELAYANG: Grafik Statistik (Kanan Bawah) */}
-              <div className="absolute -bottom-16 -right-8 lg:-right-16 bg-slate-800/90 backdrop-blur-xl border border-slate-600 p-5 rounded-2xl shadow-2xl animate-float-slow z-30 w-56 transform rotate-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <BarChart3 className="w-5 h-5 text-amber-400" />
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Statistik Kelas</span>
-                </div>
-                <div className="flex items-end justify-between gap-2 h-16">
-                  <div className="w-4 bg-blue-500 rounded-t h-[40%]"></div>
-                  <div className="w-4 bg-blue-500 rounded-t h-[65%]"></div>
-                  <div className="w-4 bg-amber-400 rounded-t h-[95%]"></div>
-                  <div className="w-4 bg-blue-500 rounded-t h-[75%]"></div>
-                  <div className="w-4 bg-blue-500 rounded-t h-[55%]"></div>
+                <div className="text-3xl font-black text-white">98<span className="text-xs text-slate-500 font-normal">/100</span></div>
+                <div className="w-full bg-slate-700 h-1.5 rounded-full mt-2">
+                  <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: '98%' }}></div>
                 </div>
               </div>
 
-              {/* 3. ELEMEN MELAYANG: Ikon Shield (Kanan Atas) */}
-              <div className="absolute top-12 -right-8 lg:-right-12 bg-slate-800/90 backdrop-blur-xl border border-slate-600 p-4 rounded-2xl shadow-2xl animate-float z-30">
-                <ShieldCheck className="w-10 h-10 text-amber-400" />
+              {/* 2. ELEMEN MELAYANG: Grafik Statistik (Kiri Bawah) */}
+              <div className="absolute -bottom-12 -left-8 lg:-left-16 bg-slate-800/90 backdrop-blur-xl border border-slate-600 p-4 rounded-2xl shadow-2xl animate-float-slow z-30 w-48 transform rotate-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <BarChart3 className="w-4 h-4 text-amber-400" />
+                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Statistik Kelas</span>
+                </div>
+                <div className="flex items-end justify-between gap-1.5 h-12">
+                  <div className="w-3 bg-blue-500 rounded-t h-[40%]"></div>
+                  <div className="w-3 bg-blue-500 rounded-t h-[65%]"></div>
+                  <div className="w-3 bg-amber-400 rounded-t h-[95%]"></div>
+                  <div className="w-3 bg-blue-500 rounded-t h-[75%]"></div>
+                  <div className="w-3 bg-blue-500 rounded-t h-[55%]"></div>
+                </div>
               </div>
 
-              {/* 4. ELEMEN MELAYANG: Buku 3D (Kiri Bawah) - Diperbesar */}
-              <div className="absolute bottom-0 -left-12 lg:-left-20 w-36 h-48 bg-gradient-to-br from-blue-500 to-indigo-700 rounded-r-2xl rounded-l-sm shadow-[20px_20px_40px_rgba(0,0,0,0.5)] z-20 animate-float-slow transform -rotate-12 border-l-[12px] border-indigo-900 p-5 flex flex-col">
-                <BookMarked className="w-10 h-10 text-white/80 mb-3" />
-                <div className="w-full h-2 bg-white/20 rounded mb-2"></div>
-                <div className="w-full h-2 bg-white/20 rounded mb-2"></div>
-                <div className="w-3/4 h-2 bg-white/20 rounded"></div>
-                <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-emerald-500 rounded-full border-[3px] border-slate-800"></div>
+              {/* 3. ELEMEN MELAYANG: Buku 3D (Kanan Bawah) */}
+              <div className="absolute -bottom-8 -right-4 lg:-right-10 w-32 h-40 bg-gradient-to-br from-blue-500 to-indigo-700 rounded-r-2xl rounded-l-sm shadow-[15px_15px_30px_rgba(0,0,0,0.5)] z-30 animate-float-slow transform rotate-12 border-l-[10px] border-indigo-900 p-4 flex flex-col">
+                <BookMarked className="w-8 h-8 text-white/80 mb-3" />
+                <div className="w-full h-1.5 bg-white/20 rounded mb-1.5"></div>
+                <div className="w-full h-1.5 bg-white/20 rounded mb-1.5"></div>
+                <div className="w-3/4 h-1.5 bg-white/20 rounded"></div>
+                <div className="absolute -bottom-2 -left-2 w-5 h-5 bg-emerald-500 rounded-full border-2 border-slate-800"></div>
               </div>
 
-              {/* --- MOCKUP LAPTOP (Diperbesar) --- */}
-              <div className="relative z-10 w-[95%] mx-auto">
+              {/* 4. ELEMEN MELAYANG: Smartphone (Kanan Atas) */}
+              <div className="absolute -top-10 -right-8 lg:-right-12 w-24 h-48 bg-slate-800 rounded-[1.5rem] border-[5px] border-slate-600 shadow-2xl z-30 animate-float transform -rotate-6 flex flex-col overflow-hidden">
+                <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-8 h-1.5 bg-slate-600 rounded-full z-20"></div>
+                <div className="w-full h-full bg-[#131C2F] p-2 pt-6 flex flex-col">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <div className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center">
+                      <User className="w-2.5 h-2.5 text-slate-400" />
+                    </div>
+                    <div className="w-10 h-1.5 bg-slate-700 rounded"></div>
+                  </div>
+                  <div className="w-full h-12 bg-blue-500/20 border border-blue-500/30 rounded-lg mb-2 flex items-center justify-center text-blue-400 text-[8px] font-bold">
+                    UJIAN AKTIF
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="w-full h-1.5 bg-slate-700 rounded"></div>
+                    <div className="w-3/4 h-1.5 bg-slate-700 rounded"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* --- MOCKUP LAPTOP --- */}
+              <div className="relative z-20 w-[95%] mx-auto mt-6">
                 {/* Layar Laptop */}
-                <div className="bg-slate-800 border-[8px] border-slate-700 rounded-t-3xl shadow-2xl overflow-hidden relative">
+                <div className="bg-slate-800 border-[8px] border-slate-700 rounded-t-2xl shadow-2xl overflow-hidden relative">
                   <div className="absolute top-2 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-600 rounded-full z-30"></div>
                   
                   {/* UI di dalam Layar */}
-                  <div className="bg-[#131C2F] h-[340px] flex flex-col relative">
+                  <div className="bg-[#131C2F] h-[300px] flex flex-col relative">
                     {/* Header UI */}
-                    <div className="bg-slate-900 px-5 py-3 flex items-center justify-between border-b border-slate-700/50">
-                      <div className="flex gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-                        <div className="w-3 h-3 rounded-full bg-amber-500/80"></div>
-                        <div className="w-3 h-3 rounded-full bg-emerald-500/80"></div>
+                    <div className="bg-slate-900 px-4 py-2 flex items-center justify-between border-b border-slate-700/50">
+                      <div className="flex gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                        <Lock className="w-3.5 h-3.5 text-emerald-400" /> ujianku-cbt.vercel.app
+                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
+                        <Lock className="w-3 h-3 text-emerald-400" /> ujianku-cbt.vercel.app
                       </div>
-                      <div className="w-12"></div>
+                      <div className="w-8"></div>
                     </div>
 
                     {/* Konten Ujian */}
-                    <div className="flex flex-1 overflow-hidden p-6 gap-6">
+                    <div className="flex flex-1 overflow-hidden p-4 gap-4">
                       {/* Sidebar Mini */}
-                      <div className="w-14 flex flex-col items-center gap-2 shrink-0">
-                        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center mb-2">
-                          <Monitor className="w-5 h-5 text-white" />
+                      <div className="w-10 flex flex-col items-center gap-1.5 shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center mb-1">
+                          <Monitor className="w-4 h-4 text-white" />
                         </div>
-                        {[1, 2, 3, 4, 5].map((n) => (
-                          <div key={n} className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold ${n === 3 ? 'bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)]' : 'bg-slate-800 text-slate-500'}`}>
+                        {[1, 2, 3, 4].map((n) => (
+                          <div key={n} className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold ${n === 3 ? 'bg-amber-400 text-slate-900' : 'bg-slate-800 text-slate-500'}`}>
                             {n}
                           </div>
                         ))}
@@ -176,22 +190,22 @@ export default function HomePage() {
 
                       {/* Area Soal */}
                       <div className="flex-1 flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                          <div className="text-sm font-bold text-slate-300">Soal 3 dari 20</div>
-                          <div className="flex items-center gap-1.5 text-amber-400 font-mono text-sm bg-amber-400/10 px-3 py-1 rounded-lg border border-amber-400/20">
-                            <Clock className="w-3.5 h-3.5" /> 45:00
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="text-[10px] font-bold text-slate-300">Soal 3 dari 20</div>
+                          <div className="flex items-center gap-1 text-amber-400 font-mono text-[10px] bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                            <Clock className="w-2.5 h-2.5" /> 45:00
                           </div>
                         </div>
-                        <div className="text-slate-200 text-sm font-medium leading-relaxed mb-6">
-                          Hitunglah besar tekanan hidrostatis yang dialami seekor ikan jika diketahui massa jenis air 1000 kg/m³ dan percepatan gravitasi 10 m/s² pada kedalaman 5 meter!
+                        <div className="text-slate-200 text-xs font-medium leading-relaxed mb-4">
+                          Hitunglah besar tekanan hidrostatis yang dialami seekor ikan pada kedalaman 5 meter!
                         </div>
-                        <div className="space-y-2.5 mt-auto">
-                          {['A', 'B', 'C', 'D'].map((opt, i) => (
-                            <div key={opt} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${i === 1 ? 'border-amber-400 bg-amber-400/10' : 'border-slate-700 bg-slate-800/30'}`}>
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${i === 1 ? 'bg-amber-400 text-slate-900' : 'bg-slate-700 text-slate-400'}`}>
+                        <div className="space-y-1.5 mt-auto">
+                          {['A', 'B', 'C'].map((opt, i) => (
+                            <div key={opt} className={`flex items-center gap-2 p-1.5 rounded-lg border ${i === 1 ? 'border-amber-400 bg-amber-400/10' : 'border-slate-700 bg-slate-800/30'}`}>
+                              <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${i === 1 ? 'bg-amber-400 text-slate-900' : 'bg-slate-700 text-slate-400'}`}>
                                 {opt}
                               </div>
-                              <div className={`h-2 rounded ${i === 1 ? 'bg-amber-400/60 w-32' : 'bg-slate-600 w-24'}`}></div>
+                              <div className={`h-1.5 rounded ${i === 1 ? 'bg-amber-400/60 w-20' : 'bg-slate-600 w-16'}`}></div>
                             </div>
                           ))}
                         </div>
@@ -201,32 +215,9 @@ export default function HomePage() {
                 </div>
 
                 {/* Basis Laptop */}
-                <div className="relative mx-auto w-full h-5 bg-slate-600 rounded-b-2xl border-t border-slate-500 shadow-xl z-10 flex justify-center">
-                   <div className="w-24 h-1.5 bg-slate-700 rounded-b-lg absolute top-0"></div>
-                   <div className="w-32 h-1 bg-slate-700/50 rounded-sm absolute -bottom-2"></div>
-                </div>
-              </div>
-
-              {/* 5. ELEMEN MELAYANG BARU: Smartphone (Kanan Tengah) - Diperbesar */}
-              <div className="absolute top-[40%] -right-6 lg:-right-16 w-28 h-56 bg-slate-800 rounded-[2rem] border-[6px] border-slate-600 shadow-2xl z-30 animate-float transform rotate-6 flex flex-col overflow-hidden">
-                {/* Notch HP */}
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-2 bg-slate-600 rounded-full z-20"></div>
-                {/* Layar HP */}
-                <div className="w-full h-full bg-[#131C2F] p-3 flex flex-col pt-8">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center">
-                      <User className="w-3 h-3 text-slate-400" />
-                    </div>
-                    <div className="w-12 h-2 bg-slate-700 rounded"></div>
-                  </div>
-                  <div className="w-full h-16 bg-blue-500/20 border border-blue-500/30 rounded-xl mb-3 flex items-center justify-center text-blue-400 text-[10px] font-bold">
-                    UJIAN AKTIF
-                  </div>
-                  <div className="space-y-2">
-                    <div className="w-full h-2 bg-slate-700 rounded"></div>
-                    <div className="w-3/4 h-2 bg-slate-700 rounded"></div>
-                    <div className="w-5/6 h-2 bg-slate-700 rounded"></div>
-                  </div>
+                <div className="relative mx-auto w-full h-4 bg-slate-600 rounded-b-xl border-t border-slate-500 shadow-xl z-10 flex justify-center">
+                   <div className="w-16 h-1 bg-slate-700 rounded-b-md absolute top-0"></div>
+                   <div className="w-20 h-1 bg-slate-700/50 rounded-sm absolute -bottom-1.5"></div>
                 </div>
               </div>
 
@@ -235,7 +226,7 @@ export default function HomePage() {
         </div>
 
         {/* Footer */}
-        <div className="mt-24 text-center border-t border-slate-800 pt-8">
+        <div className="mt-24 text-center border-t border-slate-800 pt-8 relative z-20">
           <p className="text-sm font-medium text-slate-500">
             &copy; 2026 UjianKu. Dibuat mandiri untuk pembelajaran yang lebih baik. by Dede Yopi
           </p>
