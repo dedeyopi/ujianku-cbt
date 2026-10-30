@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, ArrowRight, AlertCircle, User, Sparkles } from "lucide-react";
-import { Button } from "../../components/Button";
-import { Card } from "../../components/Card";
-import { Input } from "../../components/Input";
-import { loginTeacher } from "../../lib/auth";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Input } from "../components/Input";
+import { loginTeacher } from "../lib/auth";
 
 export default function LoginGuruPage() {
   const [username, setUsername] = useState("");
@@ -54,7 +54,7 @@ export default function LoginGuruPage() {
 
         <div className="text-center mb-5">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-white text-xs font-semibold">
-            <Lock className="w-3.5 h-3.5" /> Panel Guru (Supabase)
+            <Lock className="w-3.5 h-3.5" /> Panel Guru
           </div>
         </div>
 
@@ -92,10 +92,13 @@ export default function LoginGuruPage() {
             </div>
           )}
 
-          <Button onClick={handleLogin} size="lg" className="w-full mt-5" disabled={loading}>
+          <button 
+            onClick={handleLogin} 
+            disabled={loading}
+            className="w-full mt-5 inline-flex items-center justify-center font-semibold rounded-xl px-6 py-3.5 text-base bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all disabled:opacity-50"
+          >
             {loading ? "Memeriksa..." : "Masuk"} <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-
+          </button>
         </Card>
 
         <div className="text-center mt-6">
