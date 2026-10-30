@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
-import { isJawabanBenar } from "../../lib/grading";
+import { hitungPoinSoal } from "../../lib/grading";
 
 export async function POST(req: Request) {
   try {
@@ -30,16 +30,14 @@ export async function POST(req: Request) {
     let updatedCount = 0;
 
     for (const res of results) {
-      let correctAuto = 0;
+      let totalPoinOto = 0;
       
-      // Perbaikan: Parse jawaban siswa jika bentuknya string
       let studentAnswers = res.answers || {};
       if (typeof studentAnswers === 'string') {
         try { studentAnswers = JSON.parse(studentAnswers); } catch(e) { studentAnswers = {}; }
       }
 
       questions.forEach((dbQ: any) => {
-        // Perbaikan: Parse kunci jawaban jika bentuknya string
         let correctAns = dbQ.correct_answer || {};
         if (typeof correctAns === 'string') {
           try { correctAns = JSON.parse(correctAns); } catch(e) { correctAns = {}; }
@@ -47,8 +45,8 @@ export async function POST(req: Request) {
         
         const q = { id: dbQ.id, type: dbQ.type, question: dbQ.question, ...correctAns };
         
-        if (studentAnswers && studentAnswers[dbQ.id] && isJawabanBenar(q as any, studentAnswers[dbQ.id])) {
-          correctAuto++;
+        if (studentAnswers && studentAnswers[dbQ.id]) {
+          totalPoinOto += hitungPoinSoal(q as any, studentAnswers[dbQ.id]);
         }
       });
 
@@ -63,13 +61,13 @@ export async function POST(req: Request) {
         });
       }
 
-      const totalPoin = correctAuto + essayContribution;
+      const totalPoin = totalPoinOto + essayContribution;
       const nilaiBaru = Math.round((totalPoin / totalSoal) * 100);
+      const correctRounded = Math.round(totalPoin * 100) / 100;
 
-      // Selalu lakukan update untuk memastikan data 'correct' juga tersinkronisasi
       await supabaseAdmin
         .from("results")
-        .update({ score: nilaiBaru, correct: correctAuto })
+        .update({ score: nilaiBaru, correct: correctRounded })
         .eq("id", res.id);
       updatedCount++;
     }

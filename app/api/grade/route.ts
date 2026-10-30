@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
-import { isJawabanBenar } from "../../lib/grading";
+import { hitungPoinSoal } from "../../lib/grading";
 
 export async function POST(req: Request) {
   try {
@@ -19,32 +19,26 @@ export async function POST(req: Request) {
 
     if (error || !dbExam) return NextResponse.json({ error: "Ujian tidak ditemukan" }, { status: 404 });
 
-    let benar = 0;
+    let totalPoin = 0;
     const questions = dbExam.questions.sort((a: any, b: any) => a.order_index - b.order_index);
     
     questions.forEach((dbQ: any) => {
-      // Perbaikan: Parse kunci jawaban
-      let correctAns = dbQ.correct_answer || {};
-      if (typeof correctAns === 'string') {
-        try { correctAns = JSON.parse(correctAns); } catch(e) { correctAns = {}; }
-      }
-      
-      const q = { id: dbQ.id, type: dbQ.type, question: dbQ.question, ...correctAns };
-      
-      if (isJawabanBenar(q as any, answers[dbQ.id])) {
-        benar++;
-      }
+      const q = { id: dbQ.id, type: dbQ.type, question: dbQ.question, ...(dbQ.correct_answer || {}) };
+      totalPoin += hitungPoinSoal(q as any, answers[dbQ.id]);
     });
 
     const totalSoal = questions.length;
-    const nilai = Math.round((benar / totalSoal) * 100);
+    // Bulatkan nilai akhir
+    const nilai = Math.round((totalPoin / totalSoal) * 100);
+    // Bulatkan total jawaban benar (untuk ditampilkan di tabel)
+    const correctRounded = Math.round(totalPoin * 100) / 100;
 
     const { error: insertError } = await supabaseAdmin.from("results").insert({
       id: crypto.randomUUID(),
       exam_id: examId,
       student_id: studentId,
       score: nilai,
-      correct: benar,
+      correct: correctRounded, // Simpan desimal
       total: totalSoal,
       violations: violations || 0,
       answers: answers,
@@ -54,7 +48,7 @@ export async function POST(req: Request) {
     if (insertError) throw insertError;
 
     return NextResponse.json({ 
-      success: true, score: nilai, correct: benar, total: totalSoal, studentName: dbExam.users?.full_name 
+      success: true, score: nilai, correct: correctRounded, total: totalSoal, studentName: dbExam.users?.full_name 
     });
 
   } catch (err: any) {

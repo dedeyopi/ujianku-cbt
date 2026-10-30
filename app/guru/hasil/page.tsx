@@ -9,7 +9,7 @@ import { isLoggedIn } from "../../lib/auth";
 import { fetchExams, fetchResultsByExam, updateResultGrades } from "../../lib/db";
 import { exportResultsToExcel, exportQuestionAnalysisToExcel } from "../../lib/excel";
 import { supabase } from "../../lib/supabase";
-import { isJawabanBenar } from "../../lib/grading";
+import { isJawabanBenar } from "../../lib/grading"; // <-- Import dari sini
 import type { Exam, ExamResult, Question } from "../../lib/types";
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
