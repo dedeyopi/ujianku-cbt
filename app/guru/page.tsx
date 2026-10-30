@@ -21,7 +21,7 @@ export default function DashboardGuruPage() {
   useEffect(() => {
     async function loadData() {
       const loggedIn = await isLoggedIn();
-      if (!loggedIn) { router.push("/guru/login"); return; }
+      if (!loggedIn) { router.push("/login-guru"); return; }
 
       const data = await fetchExams();
       setExams(data);
@@ -45,7 +45,7 @@ export default function DashboardGuruPage() {
       {/* 1. WELCOME BANNER */}
       <div className="bg-gradient-to-r from-[#3b82f6] to-[#2563eb] rounded-2xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3"></div>
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2 relative z-10">Selamat Pagi, Admin! 👋</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 relative z-10">Selamat Datang, Admin! 👋</h1>
         <p className="text-blue-100 text-sm sm:text-base relative z-10 max-w-2xl">
           Sistem Computer Based Test dengan teknologi terdepan untuk pengelolaan ujian digital yang aman dan efisien.
         </p>
