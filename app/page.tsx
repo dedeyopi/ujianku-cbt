@@ -78,7 +78,7 @@ export default function HomePage() {
               </button>
               
               <button
-                onClick={() => router.push("/guru/login")}
+                onClick={() => router.push("/login-guru")}
                 className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all"
               >
                 <Lock className="w-5 h-5 mr-2 text-slate-400" />
@@ -189,7 +189,7 @@ export default function HomePage() {
         {/* Footer */}
         <div className="mt-24 text-center border-t border-slate-800 pt-8">
           <p className="text-sm font-medium text-slate-500">
-            &copy; 2026 UjianKu. Dibuat mandiri by Dede Yopi untuk pembelajaran yang lebih baik.
+            &copy; 2025 UjianKu. Dibuat mandiri untuk pembelajaran yang lebih baik.
           </p>
         </div>
       </div>

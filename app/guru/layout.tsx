@@ -5,8 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
   Menu, Home, BookMarked, FileText, Trophy, PieChart, 
-  Database, Server, ShieldCheck, Activity, Settings, 
-  FileBox, LogOut, Sun, Maximize, User
+  Database, ShieldCheck, Activity, LogOut, Sun, Maximize, User
 } from "lucide-react";
 import { logout } from "../lib/auth";
 
@@ -32,15 +31,15 @@ function GuruLayoutContent({ children }: { children: React.ReactNode }) {
 
   async function handleLogout() {
     await logout();
-    router.push("/");
+    router.push("/login-guru"); // <-- Diarahkan ke /login-guru
   }
 
   const menuItems = [
     { name: "Dashboard", icon: Home, path: "/guru" },
     { name: "Bank Soal", icon: BookMarked, path: "/guru/bank-soal" },
-    { name: "Ujian", icon: FileText, path: "/guru/ujian" },
+    { name: "Ujian", icon: FileText, path: "/guru/ujian" }, // <-- Sudah diperbaiki
     { name: "Hasil Ujian", icon: Trophy, path: "/guru/hasil" },
-    { name: "Analisis Soal", icon: PieChart, path: "/guru/analisis" },
+    { name: "Analisis Soal", icon: PieChart, path: "/guru/hasil" }, // <-- Diarahkan ke hasil (karena tab analisis ada di sana)
   ];
 
   const adminItems = [
