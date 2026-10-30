@@ -2,135 +2,234 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Plus, LogOut, FileText, Clock, BookOpen, TrendingUp, Trash2, Edit3, Users, Trophy, Copy, MonitorPlay, BookMarked
+import { 
+  FileText, Users, Trophy, Settings, Calendar as CalendarIcon, 
+  ChevronRight, BookOpen, Clock, Plus, CheckCircle2, AlertCircle
 } from "lucide-react";
-import { Button } from "../components/Button";
-import { Card } from "../components/Card";
-import { Logo } from "../components/Logo";
-import { fetchExams, removeExam, duplicateExam } from "../lib/db";
-import { isLoggedIn, logout } from "../lib/auth"; 
+import { fetchExams } from "../lib/db";
+import { supabase } from "../lib/supabase";
+import { isLoggedIn } from "../lib/auth";
 import type { Exam } from "../lib/types";
 
 export default function DashboardGuruPage() {
   const router = useRouter();
   const [exams, setExams] = useState<Exam[]>([]);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [totalQuestions, setTotalQuestions] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    async function checkAuthAndFetch() {
+    async function loadData() {
       const loggedIn = await isLoggedIn();
       if (!loggedIn) { router.push("/guru/login"); return; }
+
       const data = await fetchExams();
       setExams(data);
+      setTotalQuestions(data.reduce((sum, e) => sum + e.questions.length, 0));
+
+      const { count } = await supabase.from("users").select("*", { count: 'exact', head: true }).eq("role", "student");
+      setTotalStudents(count || 0);
+
       setLoading(false);
-      setIsCheckingAuth(false);
     }
-    checkAuthAndFetch();
+    loadData();
   }, [router]);
 
-  async function handleLogout() {
-    await logout();
-    router.push("/");
+  if (loading) {
+    return <div className="flex items-center justify-center h-full"><p className="text-slate-500 animate-pulse">Memuat dashboard...</p></div>;
   }
-
-  async function handleDelete(id: string, title: string) {
-    if (!confirm(`Hapus ujian "${title}"?`)) return;
-    const success = await removeExam(id);
-    if (success) setExams(await fetchExams());
-    else alert("Gagal menghapus.");
-  }
-
-  async function handleDuplicate(id: string) {
-    if (!confirm("Duplikat ujian ini? (Status akan menjadi Draft)")) return;
-    const success = await duplicateExam(id);
-    if (success) {
-      alert("Ujian berhasil diduplikat!");
-      setExams(await fetchExams());
-    } else {
-      alert("Gagal menduplikat ujian.");
-    }
-  }
-
-  if (loading || isCheckingAuth) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-sm text-slate-500 animate-pulse">Memuat data...</p></div>;
-  }
-
-  const totalSoal = exams.reduce((sum, e) => sum + e.questions.length, 0);
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Logo className="w-10 h-10" />
+    <div className="space-y-6 max-w-7xl mx-auto">
+      
+      {/* 1. WELCOME BANNER */}
+      <div className="bg-gradient-to-r from-[#3b82f6] to-[#2563eb] rounded-2xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3"></div>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 relative z-10">Selamat Pagi, Admin! 👋</h1>
+        <p className="text-blue-100 text-sm sm:text-base relative z-10 max-w-2xl">
+          Sistem Computer Based Test dengan teknologi terdepan untuk pengelolaan ujian digital yang aman dan efisien.
+        </p>
+      </div>
+
+      {/* 2. STAT CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        
+        {/* Card 1: Total Soal */}
+        <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl p-5 shadow-md text-white relative overflow-hidden">
+          <div className="flex justify-between items-start">
             <div>
-              <h1 className="font-bold text-slate-900 leading-tight">Ujian<span className="text-emerald-600">Ku</span></h1>
-              <p className="text-xs text-slate-500 leading-tight">Panel Guru</p>
+              <p className="text-indigo-100 text-sm font-medium mb-1">Total Soal</p>
+              <h3 className="text-3xl font-black">{totalQuestions}</h3>
+            </div>
+            <div className="p-2 bg-white/20 rounded-lg"><FileText className="w-6 h-6" /></div>
+          </div>
+          <div className="mt-4"><span className="text-xs bg-indigo-700/50 px-2 py-1 rounded-md">Seluruh Bank Soal</span></div>
+        </div>
+
+        {/* Card 2: Total Peserta */}
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 shadow-md text-white relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-emerald-100 text-sm font-medium mb-1">Total Peserta</p>
+              <h3 className="text-3xl font-black">{totalStudents}</h3>
+            </div>
+            <div className="p-2 bg-white/20 rounded-lg"><Users className="w-6 h-6" /></div>
+          </div>
+          <div className="mt-4"><span className="text-xs bg-emerald-700/50 px-2 py-1 rounded-md">Siswa Terdaftar</span></div>
+        </div>
+
+        {/* Card 3: Total Ujian */}
+        <div className="bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl p-5 shadow-md text-white relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-amber-100 text-sm font-medium mb-1">Total Ujian</p>
+              <h3 className="text-3xl font-black">{exams.length}</h3>
+            </div>
+            <div className="p-2 bg-white/20 rounded-lg"><Trophy className="w-6 h-6" /></div>
+          </div>
+          <div className="mt-4"><span className="text-xs bg-amber-600/50 px-2 py-1 rounded-md">Ujian Dibuat</span></div>
+        </div>
+
+        {/* Card 4: Sistem */}
+        <div className="bg-gradient-to-br from-sky-400 to-sky-500 rounded-2xl p-5 shadow-md text-white relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sky-100 text-sm font-medium mb-1">Versi Sistem</p>
+              <h3 className="text-3xl font-black">v1.0</h3>
+            </div>
+            <div className="p-2 bg-white/20 rounded-lg"><Settings className="w-6 h-6" /></div>
+          </div>
+          <div className="mt-4"><span className="text-xs bg-sky-700/50 px-2 py-1 rounded-md">UjianKu Enterprise</span></div>
+        </div>
+      </div>
+
+      {/* 3. MAIN CONTENT (TABEL & KALENDER) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Tabel Ujian (Kiri) */}
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><CalendarIcon className="w-5 h-5 text-blue-500" /> Jadwal Ujian Terbaru</h2>
+            <button onClick={() => router.push("/guru/ujian")} className="text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center">
+              Lihat Semua <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-6 py-4">No</th>
+                  <th className="px-6 py-4">Mata Pelajaran</th>
+                  <th className="px-6 py-4">Nama Ujian</th>
+                  <th className="px-6 py-4">Tanggal & Waktu</th>
+                  <th className="px-6 py-4 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {exams.slice(0, 5).map((exam, i) => (
+                  <tr key={exam.id} className="hover:bg-slate-50/50 transition">
+                    <td className="px-6 py-4 font-bold text-slate-400">{i + 1}</td>
+                    <td className="px-6 py-4 font-medium text-slate-800 flex items-center gap-2">
+                      <div className="w-6 h-6 rounded bg-blue-100 flex items-center justify-center text-blue-600">
+                        <BookOpen className="w-3.5 h-3.5" />
+                      </div>
+                      {exam.subject}
+                    </td>
+                    <td className="px-6 py-4 text-slate-600">{exam.title}</td>
+                    <td className="px-6 py-4 text-slate-600">
+                      {new Date(exam.createdAt).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}
+                      <br/>
+                      <span className="text-xs text-slate-400 flex items-center gap-1 mt-1"><Clock className="w-3 h-3" /> {Math.floor(exam.duration / 60)} Menit</span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {exam.isActive ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Aktif
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100">
+                          <AlertCircle className="w-3.5 h-3.5" /> Draft
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {exams.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500">Belum ada ujian yang dibuat.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Kalender & Aksi (Kanan) */}
+        <div className="space-y-6">
+          
+          {/* Kalender Statis (Visual) */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2"><CalendarIcon className="w-4 h-4 text-blue-500" /> Kalender</h2>
+              <span className="text-xs font-medium text-slate-500">Maret 2026</span>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-400 mb-2">
+              <div>Sen</div><div>Sel</div><div>Rab</div><div>Kam</div><div>Jum</div><div>Sab</div><div>Min</div>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-sm text-slate-600">
+              <div className="p-1.5 text-slate-300">23</div>
+              <div className="p-1.5 text-slate-300">24</div>
+              <div className="p-1.5 text-slate-300">25</div>
+              <div className="p-1.5 text-slate-300">26</div>
+              <div className="p-1.5 text-slate-300">27</div>
+              <div className="p-1.5 text-slate-300">28</div>
+              <div className="p-1.5 text-slate-300">29</div>
+              
+              <div className="p-1.5 text-slate-300">1</div>
+              <div className="p-1.5 text-slate-300">2</div>
+              <div className="p-1.5 text-slate-300">3</div>
+              <div className="p-1.5 text-slate-300">4</div>
+              <div className="p-1.5 text-slate-300">5</div>
+              <div className="p-1.5 text-slate-300">6</div>
+              <div className="p-1.5 text-slate-300">7</div>
+
+              <div className="p-1.5">8</div>
+              <div className="p-1.5">9</div>
+              <div className="p-1.5">10</div>
+              <div className="p-1.5">11</div>
+              <div className="p-1.5">12</div>
+              <div className="p-1.5">13</div>
+              <div className="p-1.5">14</div>
+
+              <div className="p-1.5">15</div>
+              <div className="p-1.5 bg-blue-600 text-white rounded-md shadow-sm">16</div>
+              <div className="p-1.5">17</div>
+              <div className="p-1.5">18</div>
+              <div className="p-1.5">19</div>
+              <div className="p-1.5">20</div>
+              <div className="p-1.5">21</div>
+
+              <div className="p-1.5">22</div>
+              <div className="p-1.5">23</div>
+              <div className="p-1.5">24</div>
+              <div className="p-1.5">25</div>
+              <div className="p-1.5">26</div>
+              <div className="p-1.5">27</div>
+              <div className="p-1.5">28</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="secondary" size="sm" onClick={() => router.push("/guru/bank-soal")}>
-              <BookMarked className="w-4 h-4 mr-1.5" />Bank Soal
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => router.push("/guru/pantau")}>
-              <MonitorPlay className="w-4 h-4 mr-1.5" />Pantau
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => router.push("/guru/hasil")}>
-              <Trophy className="w-4 h-4 mr-1.5" />Hasil
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => router.push("/guru/siswa")}>
-              <Users className="w-4 h-4 mr-1.5" />Siswa
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-1.5" />Keluar
-            </Button>
+          {/* Aksi Cepat */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+            <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">⚡ Aksi Cepat</h2>
+            <button onClick={() => router.push("/guru/ujian/baru")} className="w-full py-3 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold rounded-xl text-sm transition flex items-center justify-center gap-2 border border-blue-100">
+              <Plus className="w-4 h-4" /> Buat Ujian Baru
+            </button>
           </div>
-        </div>
-      </header>
 
-      <div className="max-w-5xl mx-auto p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="p-5"><div className="flex items-center justify-between"><div><p className="text-xs text-slate-500 mb-1">Total Ujian</p><p className="text-3xl font-bold text-slate-900">{exams.length}</p></div><div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center"><FileText className="w-5 h-5 text-emerald-600" /></div></div></Card>
-          <Card className="p-5"><div className="flex items-center justify-between"><div><p className="text-xs text-slate-500 mb-1">Total Soal</p><p className="text-3xl font-bold text-slate-900">{totalSoal}</p></div><div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center"><BookOpen className="w-5 h-5 text-teal-600" /></div></div></Card>
-          <Card className="p-5"><div className="flex items-center justify-between"><div><p className="text-xs text-slate-500 mb-1">Status</p><p className="text-3xl font-bold text-slate-900">{exams.length === 0 ? "Kosong" : exams.some((e) => e.isActive) ? "Aktif" : "Draft"}</p></div><div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center"><TrendingUp className="w-5 h-5 text-amber-600" /></div></div></Card>
         </div>
-
-        <div className="flex items-center justify-between mb-4">
-          <div><h2 className="text-xl font-bold text-slate-900">Daftar Ujian</h2><p className="text-sm text-slate-500">Kelola ujian yang tersimpan di server</p></div>
-          <button onClick={() => router.push("/guru/ujian/baru")} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"><Plus className="w-4 h-4 mr-1.5" />Buat Ujian</button>
-        </div>
-
-        {exams.length === 0 ? (
-          <Card className="p-12 text-center"><FileText className="w-7 h-7 text-emerald-400 mx-auto mb-3" /><h3 className="font-semibold text-slate-700 mb-1">Belum ada ujian</h3><p className="text-sm text-slate-500 mb-5">Mulai dengan membuat ujian pertama Anda</p><button onClick={() => router.push("/guru/ujian/baru")} className="inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700"><Plus className="w-4 h-4 mr-1.5" />Buat Ujian Baru</button></Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {exams.map((exam) => (
-              <Card key={exam.id} className="p-5 hover:shadow-md transition">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 truncate">{exam.title}</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">{exam.subject}</p>
-                  </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${exam.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{exam.isActive ? "Aktif" : "Draft"}</span>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-slate-500 mb-4">
-                  <span className="inline-flex items-center gap-1"><BookOpen className="w-3.5 h-3.5" />{exam.questions.length} soal</span>
-                  <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{Math.floor(exam.duration / 60)} menit</span>
-                </div>
-                <div className="flex gap-2 pt-3 border-t border-slate-100">
-                  <Button variant="secondary" size="sm" className="flex-1 hover:border-emerald-300 hover:text-emerald-700" onClick={() => router.push(`/guru/ujian/${exam.id}`)}><Edit3 className="w-3.5 h-3.5 mr-1" />Edit</Button>
-                  <Button variant="secondary" size="sm" onClick={() => handleDuplicate(exam.id)} title="Duplikat"><Copy className="w-3.5 h-3.5" /></Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(exam.id, exam.title)} className="text-red-600 hover:bg-red-50" title="Hapus"><Trash2 className="w-3.5 h-3.5" /></Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-        <p className="text-xs text-slate-400 text-center mt-8">Data tersimpan aman di Supabase Cloud.</p>
       </div>
-    </main>
+    </div>
   );
 }
