@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Edit3, Trash2, Copy, FileText, BookOpen, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, Edit3, Trash2, Copy, FileText, BookOpen, Clock, CheckCircle2, AlertCircle, FileDown } from "lucide-react";
 import { fetchExams, removeExam, duplicateExam } from "../../lib/db";
 import { isLoggedIn } from "../../lib/auth";
+import { exportToWord, exportToPDF } from "../../lib/export-docs"; // Import fungsi export
 import type { Exam } from "../../lib/types";
 
 export default function DaftarUjianPage() {
@@ -86,9 +87,19 @@ export default function DaftarUjianPage() {
               <h3 className="text-lg font-bold text-slate-800 mb-1 line-clamp-2">{exam.title}</h3>
               <p className="text-sm text-slate-500 mb-4">{exam.subject}</p>
               
-              <div className="flex items-center gap-4 text-xs font-medium text-slate-600 mb-6 bg-slate-50 p-3 rounded-xl mt-auto">
+              <div className="flex items-center gap-4 text-xs font-medium text-slate-600 mb-4 bg-slate-50 p-3 rounded-xl mt-auto">
                 <span className="flex items-center gap-1.5"><BookOpen className="w-4 h-4 text-slate-400" /> {exam.questions.length} Soal</span>
                 <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-slate-400" /> {Math.floor(exam.duration / 60)} Menit</span>
+              </div>
+
+              {/* TOMBOL EXPORT */}
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => exportToPDF(exam)} className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-lg text-xs transition flex items-center justify-center gap-1.5 border border-red-100">
+                  <FileDown className="w-3.5 h-3.5" /> PDF
+                </button>
+                <button onClick={() => exportToWord(exam)} className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded-lg text-xs transition flex items-center justify-center gap-1.5 border border-blue-100">
+                  <FileDown className="w-3.5 h-3.5" /> Word
+                </button>
               </div>
 
               <div className="flex gap-2 pt-4 border-t border-slate-100">
