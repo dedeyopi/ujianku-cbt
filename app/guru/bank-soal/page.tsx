@@ -10,9 +10,9 @@ import { fetchBankQuestions, deleteBankQuestion } from "../../lib/db";
 import type { Question } from "../../lib/types";
 
 const TIPE_LABEL: Record<string, string> = {
-  multiple_choice: "PG", complex_mc: "PG Kompleks", true_false: "B/S",
-  multi_true_false: "B/S Bertingkat", matching: "Jodohkan",
-  ordering: "Urutkan", short_answer: "Isian", essay: "Esai",
+  multiple_choice: "PG", complex_mc: "PG KOMPLEKS", true_false: "B/S",
+  multi_true_false: "B/S BERTINGKAT", matching: "JODOHKAN",
+  ordering: "URUTKAN", short_answer: "ISIAN", essay: "ESAI",
 };
 
 export default function BankSoalPage() {
@@ -97,19 +97,25 @@ export default function BankSoalPage() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {filteredQuestions.map((q) => (
-              <Card key={q.id} className="p-4">
+            {/* Tambahkan parameter 'index' (i) pada map */}
+            {filteredQuestions.map((q, i) => (
+              <Card key={q.id} className="p-4 hover:shadow-md transition">
                 <div className="flex items-start gap-4">
+                  {/* NOMOR URUT SOAL */}
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-bold text-sm flex items-center justify-center shrink-0 mt-1">
+                    {i + 1}
+                  </div>
+
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 uppercase">{TIPE_LABEL[q.type]}</span>
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 uppercase">{TIPE_LABEL[q.type] || q.type}</span>
                       <span className="text-xs text-slate-400">• {q.subject}</span>
-                      {q.topic && <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Bab: {q.topic}</span>}
+                      {q.topic && <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">Bab: {q.topic}</span>}
                     </div>
                     <div className="font-medium text-slate-900 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
                     {q.image && <img src={q.image} className="max-h-24 rounded-lg border border-slate-200 mb-2" />}
                   </div>
-                  <button onClick={() => handleDelete(q.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg shrink-0">
+                  <button onClick={() => handleDelete(q.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg shrink-0 mt-1" title="Hapus Soal">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
