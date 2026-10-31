@@ -22,21 +22,22 @@ function cleanText(html: string | undefined): string {
 }
 
 // --- FUNGSI MENGUNDUH GAMBAR MENJADI BASE64 ---
-async function getBase64ImageFromUrl(imageUrl: string) {
-  var res = await fetch(imageUrl);
-  var blob = await res.blob();
+async function getBase64ImageFromUrl(imageUrl: string): Promise<string> {
+  const res = await fetch(imageUrl);
+  const blob = await res.blob();
 
   return new Promise<string>((resolve, reject) => {
-    var reader = new FileReader();
-    reader.addEventListener("load", function () {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
       resolve(reader.result as string);
     }, false);
 
+    // PERBAIKAN ERROR 1: Jangan gunakan 'this', gunakan new Error
     reader.onerror = () => {
-      return reject(this);
+      reject(new Error("Gagal membaca file gambar"));
     };
     reader.readAsDataURL(blob);
-  })
+  });
 }
 
 // ==========================================
@@ -83,12 +84,17 @@ export async function exportToWord(exam: Exam) {
       try {
         const base64Img = await getBase64ImageFromUrl(q.image);
         const imgBuffer = await fetch(base64Img).then(res => res.arrayBuffer());
+        
+        // PERBAIKAN ERROR 2: Tentukan tipe gambar agar TypeScript tidak error
+        const imgType = base64Img.includes("data:image/png") ? "png" : "jpg";
+
         children.push(
           new Paragraph({
             children: [
               new ImageRun({
                 data: imgBuffer,
-                transformation: { width: 300, height: 200 }, // Ukuran default di Word
+                transformation: { width: 300, height: 200 },
+                type: imgType, // <-- Wajib ditambahkan di versi docx terbaru
               }),
             ],
             spacing: { after: 100 },
@@ -199,12 +205,15 @@ export async function exportToPDF(exam: Exam) {
     if (q.image) {
       try {
         const base64Img = await getBase64ImageFromUrl(q.image);
+        
+        // Deteksi format gambar untuk PDF
+        const imgFormat = base64Img.includes("data:image/png") ? 'PNG' : 'JPEG';
+
         // Cek apakah perlu halaman baru untuk gambar
         if (yPos > 200) { doc.addPage(); yPos = 20; }
         
-        // Tambahkan gambar (Lebar 80mm, Tinggi otomatis menyesuaikan proporsi atau fix misal 60mm)
-        doc.addImage(base64Img, 'JPEG', margin + 5, yPos, 80, 60);
-        yPos += 65; // Geser posisi setelah gambar
+        doc.addImage(base64Img, imgFormat, margin + 5, yPos, 80, 60);
+        yPos += 65; 
       } catch (e) {
         doc.setFont("helvetica", "italic");
         doc.text("[Gagal memuat gambar]", margin + 5, yPos);
