@@ -144,7 +144,7 @@ function GuruLayoutContent({ children }: { children: React.ReactNode }) {
                 <User className="w-5 h-5" />
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-sm font-bold text-slate-800 leading-tight">Guru Admin</p>
+                <p className="text-sm font-bold text-slate-800 leading-tight">Dede Yopi, M.Pd.</p>
                 <p className="text-xs text-slate-500 leading-tight">Pengelola Ujian</p>
               </div>
             </div>
