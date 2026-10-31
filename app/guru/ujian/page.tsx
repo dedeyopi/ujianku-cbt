@@ -94,7 +94,7 @@ export default function DaftarUjianPage() {
 
               {/* TOMBOL EXPORT */}
               <div className="flex gap-2 mb-4">
-                <button onClick={() => exportToPDF(exam)} className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-lg text-xs transition flex items-center justify-center gap-1.5 border border-red-100">
+                <button onClick={async () => await exportToPDF(exam)} className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-lg text-xs transition flex items-center justify-center gap-1.5 border border-red-100">
                   <FileDown className="w-3.5 h-3.5" /> PDF
                 </button>
                 <button onClick={() => exportToWord(exam)} className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold rounded-lg text-xs transition flex items-center justify-center gap-1.5 border border-blue-100">

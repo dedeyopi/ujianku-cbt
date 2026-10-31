@@ -1,15 +1,42 @@
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
-import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, ImageRun } from "docx";
 import { saveAs } from "file-saver";
-import type { Exam, Question } from "./types";
+import type { Exam } from "./types";
 
-// Fungsi untuk membersihkan teks dari tag HTML (seperti <div>, <p>, <sup>)
+// --- FUNGSI PEMBERSIH TEKS (ANTI-TEKS SAMPAH WORD) ---
 function cleanText(html: string | undefined): string {
   if (!html) return "";
-  let text = html.replace(/<[^>]*>?/gm, ''); // Hapus tag
-  text = text.replace(/&nbsp;/g, ' '); // Ganti spasi non-breaking
+  if (typeof window === "undefined") return html; // Fallback untuk SSR
+
+  // Gunakan DOMParser untuk mengambil HANYA teks yang terlihat
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  let text = doc.body.textContent || "";
+
+  // Bersihkan sisa-sisa teks aneh dari Word
+  text = text.replace(/false false false EN-ID X-NONE AR-SA/gi, '');
+  text = text.replace(/Normal 0/gi, '');
+  text = text.replace(/mso-[\w-]+:[^;]+;/gi, '');
+  text = text.replace(/\/\* Style Definitions \*\/[\s\S]*/gi, ''); // Hapus komentar CSS Word
+
   return text.trim();
+}
+
+// --- FUNGSI MENGUNDUH GAMBAR MENJADI BASE64 ---
+async function getBase64ImageFromUrl(imageUrl: string) {
+  var res = await fetch(imageUrl);
+  var blob = await res.blob();
+
+  return new Promise<string>((resolve, reject) => {
+    var reader = new FileReader();
+    reader.addEventListener("load", function () {
+      resolve(reader.result as string);
+    }, false);
+
+    reader.onerror = () => {
+      return reject(this);
+    };
+    reader.readAsDataURL(blob);
+  })
 }
 
 // ==========================================
@@ -36,8 +63,10 @@ export async function exportToWord(exam: Exam) {
     })
   );
 
-  // Soal
-  exam.questions.forEach((q, index) => {
+  // Loop Soal
+  for (let index = 0; index < exam.questions.length; index++) {
+    const q = exam.questions[index];
+
     // Nomor & Pertanyaan
     children.push(
       new Paragraph({
@@ -48,6 +77,27 @@ export async function exportToWord(exam: Exam) {
         spacing: { before: 200, after: 100 },
       })
     );
+
+    // Gambar Soal (Jika Ada)
+    if (q.image) {
+      try {
+        const base64Img = await getBase64ImageFromUrl(q.image);
+        const imgBuffer = await fetch(base64Img).then(res => res.arrayBuffer());
+        children.push(
+          new Paragraph({
+            children: [
+              new ImageRun({
+                data: imgBuffer,
+                transformation: { width: 300, height: 200 }, // Ukuran default di Word
+              }),
+            ],
+            spacing: { after: 100 },
+          })
+        );
+      } catch (e) {
+        children.push(new Paragraph({ text: "[Gagal memuat gambar]", spacing: { after: 100 } }));
+      }
+    }
 
     // Opsi / Jawaban
     if (q.type === "multiple_choice" || q.type === "complex_mc") {
@@ -83,7 +133,7 @@ export async function exportToWord(exam: Exam) {
       });
     } else if (q.type === "ordering") {
       children.push(new Paragraph({ text: "Urutkan item berikut:", indent: { left: 400 } }));
-      q.items?.forEach((item, i) => {
+      q.items?.forEach((item) => {
         children.push(
           new Paragraph({
             text: `(   ) ${cleanText(item)}`,
@@ -99,7 +149,7 @@ export async function exportToWord(exam: Exam) {
       children.push(new Paragraph({ text: "........................................................................................................." }));
       children.push(new Paragraph({ text: "........................................................................................................." }));
     }
-  });
+  }
 
   const doc = new Document({
     sections: [{ properties: {}, children }],
@@ -112,7 +162,7 @@ export async function exportToWord(exam: Exam) {
 // ==========================================
 // 2. EXPORT KE PDF
 // ==========================================
-export function exportToPDF(exam: Exam) {
+export async function exportToPDF(exam: Exam) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 15;
@@ -129,10 +179,12 @@ export function exportToPDF(exam: Exam) {
   
   let yPos = 40;
 
-  // Soal
-  exam.questions.forEach((q, index) => {
+  // Loop Soal
+  for (let index = 0; index < exam.questions.length; index++) {
+    const q = exam.questions[index];
+
     // Cek jika yPos mendekati batas bawah halaman (280)
-    if (yPos > 270) {
+    if (yPos > 260) {
       doc.addPage();
       yPos = 20;
     }
@@ -142,6 +194,24 @@ export function exportToPDF(exam: Exam) {
     const splitQuestion = doc.splitTextToSize(questionText, maxLineWidth);
     doc.text(splitQuestion, margin, yPos);
     yPos += splitQuestion.length * 6 + 2;
+
+    // Gambar Soal (Jika Ada)
+    if (q.image) {
+      try {
+        const base64Img = await getBase64ImageFromUrl(q.image);
+        // Cek apakah perlu halaman baru untuk gambar
+        if (yPos > 200) { doc.addPage(); yPos = 20; }
+        
+        // Tambahkan gambar (Lebar 80mm, Tinggi otomatis menyesuaikan proporsi atau fix misal 60mm)
+        doc.addImage(base64Img, 'JPEG', margin + 5, yPos, 80, 60);
+        yPos += 65; // Geser posisi setelah gambar
+      } catch (e) {
+        doc.setFont("helvetica", "italic");
+        doc.text("[Gagal memuat gambar]", margin + 5, yPos);
+        doc.setFont("helvetica", "normal");
+        yPos += 8;
+      }
+    }
 
     doc.setFont("helvetica", "normal");
     
@@ -193,8 +263,8 @@ export function exportToPDF(exam: Exam) {
       yPos += 8;
     }
 
-    yPos += 4; // Jarak antar soal
-  });
+    yPos += 6; // Jarak antar soal
+  }
 
   doc.save(`Soal_${exam.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
 }
