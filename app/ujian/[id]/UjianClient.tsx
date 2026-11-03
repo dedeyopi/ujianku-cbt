@@ -55,19 +55,20 @@ export function UjianClient() {
   const [jawaban, setJawaban] = useState<Record<string, any>>({});
   const [sisaWaktu, setSisaWaktu] = useState(0);
   const [violations, setViolations] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   const [showStartPrompt, setShowStartPrompt] = useState(true);
   const [isResume, setIsResume] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [selesai, setSelesai] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showNavModal, setShowNavModal] = useState(false); // State untuk Pop-up Navigasi
+  const [isExamLocked, setIsExamLocked] = useState(false); // State Kunci Ujian
+  const [showNavModal, setShowNavModal] = useState(false); 
   
   const [studentData, setStudentData] = useState<{ id: string; className: string } | null>(null);
 
   const violationsRef = useRef(0);
   const skipAutoSaveRef = useRef(true);
-  
   const tabIdRef = useRef<string>("");
 
   useEffect(() => {
@@ -113,17 +114,11 @@ export function UjianClient() {
         await supabase.from("active_sessions").update({ tab_id: tabId, last_seen: new Date().toISOString() }).eq("id", sessionId);
       } else {
         await supabase.from("active_sessions").insert({
-          id: sessionId,
-          exam_id: examId,
-          student_id: user.id,
-          student_name: profile.full_name,
-          class_name: profile.class_name || "-",
-          current_question: 1,
-          total_questions: found.questions.length,
-          violations: 0,
-          last_seen: new Date().toISOString(),
-          started_at: startedAt,
-          tab_id: tabId
+          id: sessionId, exam_id: examId, student_id: user.id,
+          student_name: profile.full_name, class_name: profile.class_name || "-",
+          current_question: 1, total_questions: found.questions.length,
+          violations: 0, last_seen: new Date().toISOString(),
+          started_at: startedAt, tab_id: tabId
         });
       }
 
@@ -138,6 +133,12 @@ export function UjianClient() {
         setViolations(existing.violations);
         violationsRef.current = existing.violations;
         
+        // Jika sebelumnya sudah 3x melanggar, langsung kunci
+        if (existing.violations >= 3) {
+          setIsExamLocked(true);
+          setSelesai(true);
+        }
+
         const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
         const sisa = Math.max(0, found.duration - elapsed);
         setSisaWaktu(sisa);
@@ -168,10 +169,7 @@ export function UjianClient() {
     if (!exam || !studentData || showStartPrompt || selesai) return;
     const sync = async () => {
       const success = await syncActiveSession(
-        `${exam.id}_${studentData.id}`,
-        tabIdRef.current,
-        nomorSoal + 1,
-        violations
+        `${exam.id}_${studentData.id}`, tabIdRef.current, nomorSoal + 1, violations
       );
       if (!success) {
         alert("Sesi ujian Anda telah berakhir (kemungkinan dikumpulkan di perangkat lain).");
@@ -182,6 +180,58 @@ export function UjianClient() {
     const interval = setInterval(sync, 5000);
     return () => clearInterval(interval);
   }, [exam, studentData, nama, nomorSoal, violations, showStartPrompt, selesai]);
+
+  // --- FUNGSI PENANGANAN PELANGGARAN (THREE-STRIKE) ---
+  const handleViolation = useCallback((message: string) => {
+    if (isExamLocked || selesai || isSubmitting) return;
+
+    violationsRef.current += 1;
+    const newViolationCount = violationsRef.current;
+    setViolations(newViolationCount);
+
+    const s = getSession(examId);
+    if (s) {
+      saveSession({ ...s, violations: newViolationCount, lastUpdated: new Date().toISOString() });
+    }
+
+    if (newViolationCount >= 3) {
+      // PELANGGARAN KE-3: KUNCI UJIAN
+      setIsExamLocked(true);
+      setShowWarning(false);
+      submitExam(true); // Kirim paksa
+    } else {
+      // PELANGGARAN 1 & 2: PERINGATAN
+      setShowWarning(true);
+    }
+  }, [examId, isExamLocked, selesai, isSubmitting]);
+
+  // --- DETEKSI KELUAR FULLSCREEN ---
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFull = !!document.fullscreenElement;
+      setIsFullscreen(isFull);
+
+      // Jika keluar dari fullscreen saat ujian berjalan (bukan karena submit)
+      if (!isFull && !showStartPrompt && !selesai && !isSubmitting) {
+        handleViolation("Anda keluar dari mode layar penuh!");
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, [showStartPrompt, selesai, isSubmitting, handleViolation]);
+
+  // --- DETEKSI PINDAH TAB ---
+  useEffect(() => {
+    if (!exam || showStartPrompt || selesai) return;
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleViolation("Anda terdeteksi berpindah tab atau meninggalkan halaman ujian.");
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [exam, showStartPrompt, selesai, handleViolation]);
 
   useEffect(() => {
     if (showStartPrompt || selesai) return;
@@ -220,19 +270,6 @@ export function UjianClient() {
     const t = setTimeout(() => setSisaWaktu(w => w - 1), 1000);
     return () => clearTimeout(t);
   }, [sisaWaktu, exam, showStartPrompt, selesai]);
-
-  useEffect(() => {
-    if (!exam || showStartPrompt || selesai) return;
-    const handleVisibility = () => {
-      if (document.hidden) {
-        violationsRef.current += 1; setViolations(violationsRef.current); setShowWarning(true);
-        const s = getSession(examId);
-        if (s) saveSession({ ...s, violations: violationsRef.current, lastUpdated: new Date().toISOString() });
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [exam, showStartPrompt, selesai, examId]);
 
   const startExam = useCallback(() => {
     const el = document.documentElement;
@@ -282,6 +319,24 @@ export function UjianClient() {
     return <div className="min-h-screen flex items-center justify-center bg-[#0B1120]"><Loader2 className="w-8 h-8 animate-spin text-amber-400" /></div>;
   }
 
+  // TAMPILAN JIKA UJIAN TERKUNCI (3X PELANGGARAN)
+  if (isExamLocked) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-red-950 text-white p-6 font-sans">
+        <div className="w-24 h-24 rounded-full bg-red-500/20 border-4 border-red-500 flex items-center justify-center mb-8 animate-pulse">
+          <Lock className="w-12 h-12 text-red-500" />
+        </div>
+        <h1 className="text-4xl font-black mb-4 text-center">Ujian Terkunci</h1>
+        <p className="text-red-200 text-lg text-center max-w-lg mb-8 leading-relaxed">
+          Anda telah melanggar aturan ujian sebanyak <b>3 kali</b>. Sistem telah menghentikan ujian dan mengumpulkan jawaban Anda secara otomatis.
+        </p>
+        <button onClick={() => router.push("/siswa")} className="px-8 py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition">
+          Kembali ke Halaman Siswa
+        </button>
+      </div>
+    );
+  }
+
   if (isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B1120] text-white p-6">
@@ -305,13 +360,12 @@ export function UjianClient() {
           <p className="text-lg font-medium text-slate-300 mb-8">{exam.questions.length} soal • {Math.floor(exam.duration / 60)} menit</p>
           
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl text-left mb-8">
-            <p className="font-bold text-amber-400 text-lg mb-3 flex items-center gap-2"><AlertTriangle className="w-5 h-5" /> Perhatian Sebelum Memulai:</p>
+            <p className="font-bold text-amber-400 text-lg mb-3 flex items-center gap-2"><AlertTriangle className="w-5 h-5" /> Perhatian Ketat:</p>
             <ul className="list-disc pl-5 space-y-2 text-base text-slate-300">
-              <li>Ujian akan berjalan dalam mode <b className="text-white">Layar Penuh</b>.</li>
-              <li>Dilarang berpindah tab atau keluar dari layar ujian.</li>
+              <li>Ujian berjalan dalam mode <b className="text-white">Layar Penuh</b>.</li>
+              <li><b>Dilarang keluar dari layar penuh atau pindah tab.</b></li>
+              <li>Sistem akan memberi peringatan 2x. Jika melanggar <b>3x, ujian otomatis dikunci & dikirim</b>.</li>
               <li>Klik kanan, blok teks, dan Copy-Paste dinonaktifkan.</li>
-              <li>Jawaban tersimpan secara otomatis (Auto-save).</li>
-              <li>Ujian akan terkumpul paksa jika waktu habis.</li>
             </ul>
           </div>
 
@@ -369,19 +423,37 @@ export function UjianClient() {
         </div>
       )}
 
+      {/* MODAL PERINGATAN PELANGGARAN */}
       {showWarning && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
           <div className="p-8 max-w-md w-full bg-slate-800 border-2 border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-fade-in-up rounded-3xl">
-            <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4 border border-red-500/30">
-              <AlertTriangle className="w-7 h-7 text-red-500" />
+            <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4 border border-red-500/30">
+              <AlertTriangle className="w-8 h-8 text-red-500 animate-pulse" />
             </div>
-            <h3 className="text-xl font-bold text-white text-center mb-2">Pelanggaran Terdeteksi!</h3>
-            <p className="text-sm text-slate-300 text-center mb-6">Anda terdeteksi keluar dari layar ujian. Tindakan ini tercatat oleh sistem.</p>
-            <div className="bg-slate-900 rounded-xl p-4 text-center mb-6 border border-slate-700">
-              <p className="text-xs text-slate-400 mb-1">Total Pelanggaran</p>
-              <p className="text-4xl font-black text-red-500">{violations}<span className="text-lg text-red-400 font-normal">x</span></p>
+            <h3 className="text-2xl font-bold text-white text-center mb-2">Pelanggaran Terdeteksi!</h3>
+            <p className="text-sm text-slate-300 text-center mb-6 leading-relaxed">
+              Anda terdeteksi keluar dari layar ujian atau berpindah tab. Tindakan ini tercatat oleh sistem.
+            </p>
+            
+            <div className="bg-red-500/10 rounded-xl p-5 text-center mb-6 border border-red-500/20">
+              <p className="text-xs font-semibold text-red-400 uppercase tracking-widest mb-1">Peringatan Ke-</p>
+              <p className="text-5xl font-black text-red-500">{violations}<span className="text-2xl text-red-400 font-normal"> / 3</span></p>
+              {violations === 2 && (
+                <p className="text-xs font-bold text-red-400 mt-3 animate-pulse">
+                  ⚠️ HATI-HATI! Satu pelanggaran lagi akan mengunci ujian Anda secara permanen.
+                </p>
+              )}
             </div>
-            <button onClick={() => setShowWarning(false)} className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition">Kembali ke Ujian</button>
+            
+            <button onClick={() => {
+              // Jika siswa menekan tombol ini, coba masuk fullscreen lagi
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+              }
+              setShowWarning(false);
+            }} className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition shadow-lg shadow-red-600/30">
+              Saya Mengerti, Kembali ke Ujian
+            </button>
           </div>
         </div>
       )}
@@ -434,7 +506,7 @@ export function UjianClient() {
         {/* AREA SOAL */}
         <main className="flex-1 flex flex-col h-full overflow-hidden">
           
-          {/* HEADER MOBILE (PESERTA, TIMER, & TOMBOL NAVIGASI) */}
+          {/* HEADER MOBILE */}
           <div className="lg:hidden p-4 mb-4 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
@@ -447,7 +519,6 @@ export function UjianClient() {
             </div>
             
             <div className="flex items-center gap-3">
-              {/* TOMBOL NAVIGASI SOAL (MOBILE) */}
               <button onClick={() => setShowNavModal(true)} className="p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-amber-400 hover:bg-slate-700 transition shadow-sm">
                 <LayoutGrid className="w-5 h-5" />
               </button>
@@ -482,10 +553,7 @@ export function UjianClient() {
                   <button key={i} onClick={() => updateJawaban(soal.id, identifier)} className={`w-full text-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-200 ${isSelected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-900/50 hover:border-slate-500"}`}>
                     <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 transition-colors ${isSelected ? "bg-amber-400 text-slate-900" : "bg-slate-700 text-slate-300"}`}>{String.fromCharCode(65+i)}</span>
                     {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
-                    <div 
-                      className={`rich-text-content text-lg sm:text-xl prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} 
-                      dangerouslySetInnerHTML={{ __html: opt }} 
-                    />
+                    <div className={`rich-text-content text-lg sm:text-xl prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
                   </button>
                 );
               })}
@@ -501,10 +569,7 @@ export function UjianClient() {
                   }} className={`w-full text-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-200 ${selected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-900/50 hover:border-slate-500"}`}>
                     <div className={`w-8 h-8 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-500"}`}>{selected && <CheckCircle2 className="w-5 h-5"/>}</div>
                     {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
-                    <div 
-                      className={`rich-text-content text-lg sm:text-xl prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${selected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} 
-                      dangerouslySetInnerHTML={{ __html: opt }} 
-                    />
+                    <div className={`rich-text-content text-lg sm:text-xl prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${selected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
                   </button>
                 );
               })}
@@ -524,10 +589,7 @@ export function UjianClient() {
                 const curr = ans || {};
                 return (
                   <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 border-2 border-slate-600 bg-slate-900/50 rounded-2xl gap-4">
-                    <div 
-                      className="rich-text-content text-base sm:text-lg text-slate-200 flex-1 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
-                      dangerouslySetInnerHTML={{ __html: st.text }} 
-                    />
+                    <div className="rich-text-content text-base sm:text-lg text-slate-200 flex-1 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" dangerouslySetInnerHTML={{ __html: st.text }} />
                     <div className="flex gap-2 shrink-0">
                       <button onClick={() => updateJawaban(soal.id, {...curr, [i]: true})} className={`px-6 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${curr[i] === true ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>BENAR</button>
                       <button onClick={() => updateJawaban(soal.id, {...curr, [i]: false})} className={`px-6 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${curr[i] === false ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>SALAH</button>
@@ -542,10 +604,7 @@ export function UjianClient() {
                     const curr = ans || {};
                     return (
                       <div key={i} className="flex flex-col sm:flex-row gap-4 items-center">
-                        <div 
-                          className="rich-text-content flex-1 w-full p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl text-base text-slate-200 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
-                          dangerouslySetInnerHTML={{ __html: p.left }} 
-                        />
+                        <div className="rich-text-content flex-1 w-full p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl text-base text-slate-200 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" dangerouslySetInnerHTML={{ __html: p.left }} />
                         <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-4 rounded-xl border-2 border-slate-600 bg-slate-800 text-base text-white focus:border-amber-400 focus:outline-none">
                           <option value="" disabled>-- Pilih Pasangan --</option>
                           {soal.pairs?.map(pr => <option key={pr.right} value={pr.right}>{pr.right.replace(/<[^>]*>?/gm, '')}</option>)}
@@ -561,10 +620,7 @@ export function UjianClient() {
                   {(ans && Array.isArray(ans) ? ans : soal.items || []).map((item, i, arr) => (
                     <div key={i} className="flex gap-4 items-center p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl">
                       <span className="w-8 text-center font-bold text-amber-400 text-lg">{i+1}</span>
-                      <div 
-                        className="rich-text-content flex-1 text-base text-slate-200 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
-                        dangerouslySetInnerHTML={{ __html: item }} 
-                      />
+                      <div className="rich-text-content flex-1 text-base text-slate-200 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" dangerouslySetInnerHTML={{ __html: item }} />
                       <div className="flex flex-col gap-1">
                         <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className="p-2 bg-slate-700 rounded-lg text-slate-300 hover:bg-slate-600 disabled:opacity-30">▲</button>
                         <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className="p-2 bg-slate-700 rounded-lg text-slate-300 hover:bg-slate-600 disabled:opacity-30">▼</button>
@@ -587,7 +643,6 @@ export function UjianClient() {
             </div>
           </div>
 
-          {/* TOMBOL AKSI BAWAH (TANPA NAVIGASI SOAL) */}
           <div className="flex justify-between gap-4 shrink-0">
             <button 
               onClick={() => setNomorSoal(n => Math.max(0, n-1))} 
@@ -602,7 +657,7 @@ export function UjianClient() {
                 onClick={() => submitExam(false)} 
                 className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.2)] transition flex items-center justify-center gap-2"
               >
-                <CheckCircle2 className="w-5 h-5"/> Selesai
+                <CheckCircle2 className="w-5 h-5"/> Selesai & Kirim
               </button>
             ) : (
               <button 
