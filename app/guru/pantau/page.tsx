@@ -2,26 +2,24 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MonitorPlay, AlertTriangle, CheckCircle2, UserX, Search, ArrowDownAZ } from "lucide-react";
+import { 
+  ArrowLeft, MonitorPlay, AlertTriangle, CheckCircle2, 
+  UserX, Search, Unlock, RotateCcw 
+} from "lucide-react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { supabase } from "../../lib/supabase";
 import { isLoggedIn } from "../../lib/auth";
+import { unlockStudentSession, deleteStudentSession } from "../../lib/db";
 import type { ActiveSession } from "../../lib/types";
 
 function mapDbSessionToActiveSession(dbS: any): ActiveSession {
   return {
-    id: dbS.id, 
-    examId: dbS.exam_id, 
-    studentId: dbS.student_id,
-    studentName: dbS.student_name, 
-    className: dbS.class_name,
-    currentQuestion: dbS.current_question || 0, 
-    totalQuestions: dbS.total_questions || 0,
-    violations: dbS.violations || 0, 
-    lastSeen: dbS.last_seen,
-    startedAt: dbS.started_at, // <-- TAMBAHKAN INI
-    tabId: dbS.tab_id,         // <-- TAMBAHKAN INI
+    id: dbS.id, examId: dbS.exam_id, studentId: dbS.student_id,
+    studentName: dbS.student_name, className: dbS.class_name,
+    currentQuestion: dbS.current_question || 0, totalQuestions: dbS.total_questions || 0,
+    violations: dbS.violations || 0, lastSeen: dbS.last_seen,
+    startedAt: dbS.started_at, tabId: dbS.tab_id,
   };
 }
 
@@ -42,7 +40,7 @@ export default function PantauUjianPage() {
   useEffect(() => {
     async function init() {
       const loggedIn = await isLoggedIn();
-      if (!loggedIn) { router.push("/guru/login"); return; }
+      if (!loggedIn) { router.push("/login-guru"); return; }
 
       const { data } = await supabase.from("active_sessions").select("*");
       if (data) setSessions(data.map(mapDbSessionToActiveSession));
@@ -68,16 +66,30 @@ export default function PantauUjianPage() {
     init();
   }, [router]);
 
-  // Filter dan Sortir Data
+  // --- FUNGSI AKSI GURU ---
+  const handleUnlock = async (id: string, name: string) => {
+    if (!confirm(`Buka kunci untuk ${name}? Siswa dapat melanjutkan ujian tanpa mengulang.`)) return;
+    const success = await unlockStudentSession(id);
+    if (success) alert("Kunci berhasil dibuka. Minta siswa klik tombol 'Cek Status Kunci' di layar mereka.");
+    else alert("Gagal membuka kunci.");
+  };
+
+  const handleReset = async (id: string, name: string) => {
+    if (!confirm(`Reset sesi untuk ${name}? Siswa harus mengulang ujian dari awal.`)) return;
+    const success = await deleteStudentSession(id);
+    if (success) alert("Sesi dihapus. Siswa dapat mengulang ujian dari awal (refresh halaman ujian).");
+    else alert("Gagal menghapus sesi.");
+  };
+
   const processedSessions = useMemo(() => {
     let result = sessions;
 
-    // 1. Filter yang online (terakhir terlihat < 30 detik lalu)
+    // Filter yang online (terakhir terlihat < 30 detik lalu)
     if (now > 0) {
       result = result.filter(s => (now - new Date(s.lastSeen).getTime()) < 30000);
     }
 
-    // 2. Filter berdasarkan pencarian nama/kelas
+    // Filter berdasarkan pencarian nama/kelas
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       result = result.filter(s => 
@@ -86,10 +98,9 @@ export default function PantauUjianPage() {
       );
     }
 
-    // 3. Sortir
+    // Sortir
     result.sort((a, b) => {
       if (sortBy === "name") return a.studentName.localeCompare(b.studentName);
-      // Sort by progress (persentase soal yang dikerjakan)
       const progressA = a.totalQuestions > 0 ? (a.currentQuestion / a.totalQuestions) : 0;
       const progressB = b.totalQuestions > 0 ? (b.currentQuestion / b.totalQuestions) : 0;
       return progressB - progressA;
@@ -131,7 +142,6 @@ export default function PantauUjianPage() {
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Search Box */}
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input 
@@ -143,7 +153,6 @@ export default function PantauUjianPage() {
               />
             </div>
             
-            {/* Sort Dropdown */}
             <select 
               value={sortBy} 
               onChange={(e) => setSortBy(e.target.value as any)} 
@@ -172,6 +181,7 @@ export default function PantauUjianPage() {
                     <th className="px-4 py-3">Kelas</th>
                     <th className="px-4 py-3 text-center">Progress</th>
                     <th className="px-4 py-3 text-center">Pelanggaran</th>
+                    <th className="px-4 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -205,6 +215,29 @@ export default function PantauUjianPage() {
                           ) : (
                             <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
                           )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end gap-2">
+                            {/* Tombol Buka Kunci (Hanya muncul jika pelanggaran >= 3) */}
+                            {s.violations >= 3 && (
+                              <button 
+                                onClick={() => handleUnlock(s.id, s.studentName)} 
+                                className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-200 transition flex items-center gap-1"
+                                title="Buka Kunci"
+                              >
+                                <Unlock className="w-3.5 h-3.5" /> Buka
+                              </button>
+                            )}
+                            
+                            {/* Tombol Reset Sesi (Selalu muncul) */}
+                            <button 
+                              onClick={() => handleReset(s.id, s.studentName)} 
+                              className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition flex items-center gap-1"
+                              title="Reset Sesi"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" /> Reset
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
