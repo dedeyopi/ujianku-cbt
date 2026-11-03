@@ -67,15 +67,13 @@ export function ExamEditor({ examId }: Props) {
   const [savedFlash, setSavedFlash] = useState(false);
   const [pilihTipe, setPilihTipe] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [showOptImage, setShowOptImage] = useState<Record<number, boolean>>({});
+  // PERBAIKAN: Ubah tipe key menjadi string agar bisa menerima angka & teks
+  const [showOptImage, setShowOptImage] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // State Bank Soal
   const [bankModalOpen, setBankModalOpen] = useState(false);
   const [bankQuestions, setBankQuestions] = useState<Question[]>([]);
   const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
-  
-  // State Seleksi Massal (Bulk)
   const [selectedQs, setSelectedQs] = useState<string[]>([]);
 
   useEffect(() => {
@@ -140,7 +138,6 @@ export function ExamEditor({ examId }: Props) {
     setEditingQuestion(null); setIsNewQuestion(false); setShowOptImage({}); 
   }
 
-  // --- SIMPAN KE BANK SOAL ---
   async function handleSaveToBankSingle() {
     if (!editingQuestion || !exam) return;
     const subject = prompt("Simpan ke Bank Soal.\nMasukkan Mata Pelajaran:", exam.subject || "Umum");
@@ -165,7 +162,7 @@ export function ExamEditor({ examId }: Props) {
     
     if (success) {
       alert(`Berhasil menyimpan ${questionsToSave.length} soal ke Bank Soal!`);
-      setSelectedQs([]); // Reset centang
+      setSelectedQs([]);
     } else {
       alert("Gagal menyimpan soal ke Bank.");
     }
@@ -283,14 +280,11 @@ export function ExamEditor({ examId }: Props) {
               <p className="text-xs text-slate-500">Centang soal untuk menyimpannya ke Bank Soal sekaligus.</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              
-              {/* TOMBOL BULK SAVE KE BANK */}
               {selectedQs.length > 0 && (
                 <Button variant="secondary" size="sm" onClick={handleBulkSaveToBank} className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 animate-fade-in-up">
                   <BookMarked className="w-4 h-4 mr-1.5" />Simpan {selectedQs.length} Soal ke Bank
                 </Button>
               )}
-
               <Button variant="secondary" size="sm" onClick={openBank} className="border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"><BookMarked className="w-4 h-4 mr-1.5" />Ambil dari Bank</Button>
               <Button variant="secondary" size="sm" onClick={downloadTemplateImport}><FileSpreadsheet className="w-4 h-4 mr-1.5 text-slate-600" />Template</Button>
               <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting}><Upload className="w-4 h-4 mr-1.5 text-slate-600" />{isImporting ? "..." : "Import"}</Button>
@@ -322,7 +316,6 @@ export function ExamEditor({ examId }: Props) {
             </Card>
           )}
 
-          {/* SELECT ALL */}
           {exam.questions.length > 0 && (
             <div className="flex items-center gap-2 mb-2 px-2">
               <input 
@@ -338,7 +331,6 @@ export function ExamEditor({ examId }: Props) {
           {exam.questions.map((q, index) => (
             <Card key={q.id} className={`p-4 mb-3 transition ${selectedQs.includes(q.id) ? 'border-blue-400 ring-1 ring-blue-500/20 bg-blue-50/10' : ''}`}>
               <div className="flex items-start gap-3">
-                {/* CHECKBOX BULK */}
                 <input 
                   type="checkbox" 
                   checked={selectedQs.includes(q.id)} 
@@ -382,9 +374,9 @@ export function ExamEditor({ examId }: Props) {
                         <div className="flex gap-2 items-center">
                           <button onClick={() => setEditingQuestion({...editingQuestion, correctAnswer: opt || `Opsi ${i+1}`})} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ${editingQuestion.correctAnswer === (opt || `Opsi ${i+1}`) ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300"}`}>{editingQuestion.correctAnswer === (opt || `Opsi ${i+1}`) ? <Check className="w-4 h-4"/> : String.fromCharCode(65+i)}</button>
                           <div className="flex-1"><TextEditor value={opt} onChange={(val) => { const o = [...(editingQuestion.options||[])]; o[i] = val; setEditingQuestion({...editingQuestion, options: o, correctAnswer: editingQuestion.correctAnswer === opt ? val : editingQuestion.correctAnswer}) }} placeholder={`Teks Opsi ${String.fromCharCode(65+i)}`} /></div>
-                          <button onClick={() => setShowOptImage(prev => ({...prev, [i]: !prev[i]}))} className={`p-2 rounded-lg border ${showOptImage[i] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} title="Tambah Gambar"><ImageIcon className="w-4 h-4"/></button>
+                          <button onClick={() => setShowOptImage(prev => ({...prev, [i.toString()]: !prev[i.toString()]}))} className={`p-2 rounded-lg border ${showOptImage[i.toString()] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} title="Tambah Gambar"><ImageIcon className="w-4 h-4"/></button>
                         </div>
-                        {showOptImage[i] && <div className="mt-2 pl-10"><ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} /></div>}
+                        {showOptImage[i.toString()] && <div className="mt-2 pl-10"><ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} /></div>}
                       </div>
                     ))}
                   </div>
@@ -405,9 +397,9 @@ export function ExamEditor({ examId }: Props) {
                               setEditingQuestion({...editingQuestion, correctAnswers: newAns});
                             }} className="w-5 h-5 accent-emerald-600 shrink-0" />
                             <div className="flex-1"><TextEditor value={opt} onChange={(val) => { const o = [...(editingQuestion.options||[])]; o[i] = val; setEditingQuestion({...editingQuestion, options: o}) }} placeholder={`Teks Opsi ${String.fromCharCode(65+i)}`} /></div>
-                            <button onClick={() => setShowOptImage(prev => ({...prev, [i]: !prev[i]}))} className={`p-2 rounded-lg border ${showOptImage[i] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} title="Tambah Gambar"><ImageIcon className="w-4 h-4"/></button>
+                            <button onClick={() => setShowOptImage(prev => ({...prev, [i.toString()]: !prev[i.toString()]}))} className={`p-2 rounded-lg border ${showOptImage[i.toString()] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} title="Tambah Gambar"><ImageIcon className="w-4 h-4"/></button>
                           </div>
-                          {showOptImage[i] && <div className="mt-2 pl-8"><ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} /></div>}
+                          {showOptImage[i.toString()] && <div className="mt-2 pl-8"><ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} /></div>}
                         </div>
                       );
                     })}
@@ -437,7 +429,7 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 )}
 
-                                {editingQuestion.type === "matching" && (
+                {editingQuestion.type === "matching" && (
                   <div className="space-y-4">
                     <p className="text-xs text-slate-500">Masukkan pasangan soal dan jawaban. Anda bisa menambahkan gambar.</p>
                     {editingQuestion.pairs?.map((p, i) => (
@@ -531,7 +523,6 @@ export function ExamEditor({ examId }: Props) {
         </div>
       </div>
 
-      {/* MODAL BANK SOAL */}
       {bankModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 sm:p-6">
           <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col animate-fade-in-up">
