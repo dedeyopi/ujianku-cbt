@@ -261,3 +261,20 @@ export async function updateAppSettings(schoolName: string, schoolLogoUrl: strin
   }
   return true;
 }
+
+// --- FUNGSI KONTROL GURU (LIVE MONITOR) ---
+export async function unlockStudentSession(sessionId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("active_sessions")
+    .update({ violations: 0 })
+    .eq("id", sessionId);
+  return !error;
+}
+
+export async function deleteStudentSession(sessionId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("active_sessions")
+    .delete()
+    .eq("id", sessionId);
+  return !error;
+}

@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Lock, Loader2, Clock, ArrowRight, LayoutGrid, X } from "lucide-react";
+import { 
+  AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, 
+  Lock, Loader2, Clock, ArrowRight, LayoutGrid, X, RefreshCw 
+} from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { getSession, saveSession, clearSession } from "../../lib/session";
 import { fetchExamForStudent, syncActiveSession, removeActiveSession } from "../../lib/db";
@@ -62,8 +65,9 @@ export function UjianClient() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [selesai, setSelesai] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isExamLocked, setIsExamLocked] = useState(false); // State Kunci Ujian
+  const [isExamLocked, setIsExamLocked] = useState(false); 
   const [showNavModal, setShowNavModal] = useState(false); 
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false); 
   
   const [studentData, setStudentData] = useState<{ id: string; className: string } | null>(null);
 
@@ -71,6 +75,7 @@ export function UjianClient() {
   const skipAutoSaveRef = useRef(true);
   const tabIdRef = useRef<string>("");
 
+  // Inisialisasi Tab ID unik
   useEffect(() => {
     let tid = sessionStorage.getItem("ujianku_tab_id");
     if (!tid) {
@@ -80,6 +85,7 @@ export function UjianClient() {
     tabIdRef.current = tid;
   }, []);
 
+  // Muat data ujian & sesi
   useEffect(() => {
     async function loadExam() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -112,6 +118,12 @@ export function UjianClient() {
 
         startedAt = existingSession.started_at;
         await supabase.from("active_sessions").update({ tab_id: tabId, last_seen: new Date().toISOString() }).eq("id", sessionId);
+
+        // Cek jika sebelumnya sudah terkunci karena pelanggaran
+        if (existingSession.violations >= 3) {
+          setIsExamLocked(true);
+          setSelesai(true);
+        }
       } else {
         await supabase.from("active_sessions").insert({
           id: sessionId, exam_id: examId, student_id: user.id,
@@ -133,12 +145,6 @@ export function UjianClient() {
         setViolations(existing.violations);
         violationsRef.current = existing.violations;
         
-        // Jika sebelumnya sudah 3x melanggar, langsung kunci
-        if (existing.violations >= 3) {
-          setIsExamLocked(true);
-          setSelesai(true);
-        }
-
         const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
         const sisa = Math.max(0, found.duration - elapsed);
         setSisaWaktu(sisa);
@@ -165,23 +171,24 @@ export function UjianClient() {
     loadExam();
   }, [examId, router]);
 
+  // Ping server setiap 5 detik (Sinkronisasi Progress ke Live Monitor)
   useEffect(() => {
-    if (!exam || !studentData || showStartPrompt || selesai) return;
+    if (!exam || !studentData || showStartPrompt || selesai || isExamLocked) return;
     const sync = async () => {
       const success = await syncActiveSession(
         `${exam.id}_${studentData.id}`, tabIdRef.current, nomorSoal + 1, violations
       );
       if (!success) {
-        alert("Sesi ujian Anda telah berakhir (kemungkinan dikumpulkan di perangkat lain).");
+        alert("Sesi ujian Anda telah berakhir (kemungkinan dikumpulkan atau di-reset oleh guru).");
         router.push("/siswa");
       }
     };
     sync();
     const interval = setInterval(sync, 5000);
     return () => clearInterval(interval);
-  }, [exam, studentData, nama, nomorSoal, violations, showStartPrompt, selesai]);
+  }, [exam, studentData, nama, nomorSoal, violations, showStartPrompt, selesai, isExamLocked]);
 
-  // --- FUNGSI PENANGANAN PELANGGARAN (THREE-STRIKE) ---
+  // --- FUNGSI PENANGANAN PELANGGARAN ---
   const handleViolation = useCallback((message: string) => {
     if (isExamLocked || selesai || isSubmitting) return;
 
@@ -194,36 +201,40 @@ export function UjianClient() {
       saveSession({ ...s, violations: newViolationCount, lastUpdated: new Date().toISOString() });
     }
 
+    // Langsung update ke server agar guru tahu saat itu juga
+    if (exam && studentData) {
+      supabase.from("active_sessions").update({ violations: newViolationCount }).eq("id", `${exam.id}_${studentData.id}`).then();
+    }
+
     if (newViolationCount >= 3) {
-      // PELANGGARAN KE-3: KUNCI UJIAN
+      // PELANGGARAN KE-3: KUNCI UJIAN (TIDAK AUTO SUBMIT)
       setIsExamLocked(true);
+      setSelesai(true); // Hentikan timer & interaksi
       setShowWarning(false);
-      submitExam(true); // Kirim paksa
     } else {
       // PELANGGARAN 1 & 2: PERINGATAN
       setShowWarning(true);
     }
-  }, [examId, isExamLocked, selesai, isSubmitting]);
+  }, [examId, isExamLocked, selesai, isSubmitting, exam, studentData]);
 
-  // --- DETEKSI KELUAR FULLSCREEN ---
+  // Deteksi Keluar Fullscreen
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isFull = !!document.fullscreenElement;
       setIsFullscreen(isFull);
 
-      // Jika keluar dari fullscreen saat ujian berjalan (bukan karena submit)
-      if (!isFull && !showStartPrompt && !selesai && !isSubmitting) {
+      if (!isFull && !showStartPrompt && !selesai && !isSubmitting && !isExamLocked) {
         handleViolation("Anda keluar dari mode layar penuh!");
       }
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, [showStartPrompt, selesai, isSubmitting, handleViolation]);
+  }, [showStartPrompt, selesai, isSubmitting, isExamLocked, handleViolation]);
 
-  // --- DETEKSI PINDAH TAB ---
+  // Deteksi Pindah Tab
   useEffect(() => {
-    if (!exam || showStartPrompt || selesai) return;
+    if (!exam || showStartPrompt || selesai || isExamLocked) return;
     const handleVisibilityChange = () => {
       if (document.hidden) {
         handleViolation("Anda terdeteksi berpindah tab atau meninggalkan halaman ujian.");
@@ -231,8 +242,9 @@ export function UjianClient() {
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [exam, showStartPrompt, selesai, handleViolation]);
+  }, [exam, showStartPrompt, selesai, isExamLocked, handleViolation]);
 
+  // Blokir Klik Kanan, Copy, Paste
   useEffect(() => {
     if (showStartPrompt || selesai) return;
     const disableContextMenu = (e: MouseEvent) => e.preventDefault();
@@ -252,6 +264,7 @@ export function UjianClient() {
     };
   }, [showStartPrompt, selesai]);
 
+  // Auto-Save Jawaban
   useEffect(() => {
     if (!exam || skipAutoSaveRef.current) { skipAutoSaveRef.current = false; return; }
     const s = getSession(examId);
@@ -260,8 +273,10 @@ export function UjianClient() {
     setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1200);
   }, [jawaban, exam, examId]);
 
+  // Timer Ujian
   useEffect(() => {
-    if (!exam || showStartPrompt || selesai) return;
+    if (!exam || showStartPrompt || selesai || isExamLocked) return;
+    
     if (exam.endTime) {
       const now = new Date().getTime();
       if (now > new Date(exam.endTime).getTime()) { submitExam(true); return; }
@@ -269,7 +284,37 @@ export function UjianClient() {
     if (sisaWaktu <= 0) { submitExam(true); return; }
     const t = setTimeout(() => setSisaWaktu(w => w - 1), 1000);
     return () => clearTimeout(t);
-  }, [sisaWaktu, exam, showStartPrompt, selesai]);
+  }, [sisaWaktu, exam, showStartPrompt, selesai, isExamLocked]);
+
+  // Cek Status Kunci (Dipanggil siswa saat di layar merah)
+  async function checkStatus() {
+    if (!exam || !studentData) return;
+    setIsCheckingStatus(true);
+    try {
+      const { data } = await supabase.from("active_sessions").select("violations").eq("id", `${exam.id}_${studentData.id}`).single();
+      
+      if (!data) {
+        alert("Sesi Anda telah di-reset oleh guru. Silakan klik OK untuk mengulang dari awal.");
+        clearSession(examId);
+        router.push("/siswa");
+        return;
+      }
+
+      if (data.violations < 3) {
+        alert("Guru Anda telah membuka kunci. Ujian dilanjutkan!");
+        setIsExamLocked(false);
+        setSelesai(false);
+        setViolations(data.violations);
+        violationsRef.current = data.violations;
+        setShowWarning(false);
+      } else {
+        alert("Ujian masih terkunci. Silakan hubungi guru Anda.");
+      }
+    } catch (e) {
+      alert("Gagal mengecek status.");
+    }
+    setIsCheckingStatus(false);
+  }
 
   const startExam = useCallback(() => {
     const el = document.documentElement;
@@ -319,7 +364,7 @@ export function UjianClient() {
     return <div className="min-h-screen flex items-center justify-center bg-[#0B1120]"><Loader2 className="w-8 h-8 animate-spin text-amber-400" /></div>;
   }
 
-  // TAMPILAN JIKA UJIAN TERKUNCI (3X PELANGGARAN)
+  // --- LAYAR KUNCI (JIKA SISWA MELANGGAR 3X) ---
   if (isExamLocked) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-red-950 text-white p-6 font-sans">
@@ -328,11 +373,25 @@ export function UjianClient() {
         </div>
         <h1 className="text-4xl font-black mb-4 text-center">Ujian Terkunci</h1>
         <p className="text-red-200 text-lg text-center max-w-lg mb-8 leading-relaxed">
-          Anda telah melanggar aturan ujian sebanyak <b>3 kali</b>. Sistem telah menghentikan ujian dan mengumpulkan jawaban Anda secara otomatis.
+          Anda telah melanggar aturan ujian sebanyak <b>3 kali</b>. Waktu ujian dihentikan sementara. Silakan hubungi guru Anda untuk membuka kunci.
         </p>
-        <button onClick={() => router.push("/siswa")} className="px-8 py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition">
-          Kembali ke Halaman Siswa
-        </button>
+        
+        <div className="flex flex-col sm:flex-row gap-4">
+          <button 
+            onClick={checkStatus} 
+            disabled={isCheckingStatus}
+            className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+          >
+            {isCheckingStatus ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+            Cek Status Kunci
+          </button>
+          <button 
+            onClick={() => router.push("/siswa")} 
+            className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition"
+          >
+            Kembali ke Beranda
+          </button>
+        </div>
       </div>
     );
   }
@@ -364,7 +423,7 @@ export function UjianClient() {
             <ul className="list-disc pl-5 space-y-2 text-base text-slate-300">
               <li>Ujian berjalan dalam mode <b className="text-white">Layar Penuh</b>.</li>
               <li><b>Dilarang keluar dari layar penuh atau pindah tab.</b></li>
-              <li>Sistem akan memberi peringatan 2x. Jika melanggar <b>3x, ujian otomatis dikunci & dikirim</b>.</li>
+              <li>Sistem akan memberi peringatan 2x. Jika melanggar <b>3x, ujian otomatis terkunci</b>.</li>
               <li>Klik kanan, blok teks, dan Copy-Paste dinonaktifkan.</li>
             </ul>
           </div>
@@ -446,7 +505,6 @@ export function UjianClient() {
             </div>
             
             <button onClick={() => {
-              // Jika siswa menekan tombol ini, coba masuk fullscreen lagi
               if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(() => {});
               }
