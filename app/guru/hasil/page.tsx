@@ -9,7 +9,7 @@ import { isLoggedIn } from "../../lib/auth";
 import { fetchExams, fetchResultsByExam, updateResultGrades } from "../../lib/db";
 import { exportResultsToExcel, exportQuestionAnalysisToExcel } from "../../lib/excel";
 import { supabase } from "../../lib/supabase";
-import { isJawabanBenar } from "../../lib/grading"; // <-- Import dari sini
+import { isJawabanBenar } from "../../lib/grading";
 import type { Exam, ExamResult, Question } from "../../lib/types";
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
@@ -64,15 +64,12 @@ export default function HasilUjianPage() {
     setIsFetchingResults(false);
   }
 
-  // FUNGSI INI DIPERBAIKI: Mengambil ulang data ujian (kunci jawaban) & hasil siswa
   async function handleRefresh() {
     setIsRefreshing(true);
     
-    // 1. Ambil ulang daftar ujian (memuat kunci jawaban terbaru ke memori)
     const allExams = await fetchExams();
     setExams(allExams);
 
-    // 2. Ambil ulang hasil siswa
     const data = await fetchResultsByExam(selectedExamId);
     setResults(data);
     
@@ -94,7 +91,7 @@ export default function HasilUjianPage() {
       
       if (res.ok) {
         alert(`Sinkronisasi berhasil! ${data.updatedCount} nilai siswa diperbarui.`);
-        await handleRefresh(); // Panggil handleRefresh untuk update tabel & kunci jawaban
+        await handleRefresh();
       } else {
         alert("Gagal sinkronisasi: " + data.error);
       }
@@ -307,7 +304,7 @@ export default function HasilUjianPage() {
                               <td className="px-4 py-3 text-center">
                                 <span className={`inline-block px-2.5 py-1 rounded-md font-bold text-xs ${r.score >= 75 ? "bg-emerald-100 text-emerald-700" : r.score >= 60 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{r.score}</span>
                               </td>
-                              <td className="px-4 py-3 text-center text-slate-600">{r.correct} / {r.total}</td>
+                              <td className="px-4 py-3 text-center text-slate-600">{Math.round(r.correct)} / {r.total}</td>
                               <td className="px-4 py-3 text-center">
                                 {r.violations > 0 ? <span className="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded text-xs font-semibold"><AlertTriangle className="w-3 h-3" />{r.violations}x</span> : <span className="text-slate-300">-</span>}
                               </td>
@@ -389,7 +386,7 @@ export default function HasilUjianPage() {
         )}
       </div>
 
-      {/* MODAL ANALISIS JAWABAN SISWA & PENILAIAN ESAI */}
+      {/* MODAL ANALISIS JAWABAN SISWA */}
       {selectedResult && selectedExam && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 sm:p-6">
           <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col animate-fade-in-up">
@@ -415,10 +412,27 @@ export default function HasilUjianPage() {
                     </div>
                     
                     <div className="ml-9 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      {/* KOTAK JAWABAN SISWA */}
                       <div className={`p-3 rounded-lg border ${isEssay ? 'bg-blue-50 border-blue-100 col-span-full' : isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
                         <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Jawaban Siswa</p>
                         <div className="text-slate-800 prose prose-sm max-w-none">
-                          {Array.isArray(studentAns) ? (
+                          {q.type === "matching" && q.pairs ? (
+                            <ul className="list-disc pl-4 space-y-1">
+                              {q.pairs.map((p, idx) => {
+                                const siswaPilih = studentAns ? studentAns[p.left] : null;
+                                const pasanganKanan = q.pairs?.find(pr => pr.right === siswaPilih);
+                                return (
+                                  <li key={idx} className="text-sm flex items-center gap-2 flex-wrap">
+                                    {p.leftImage && <img src={p.leftImage} className="h-8 inline-block rounded border" />}
+                                    <span>{p.left}</span>
+                                    <span className="font-bold">→</span>
+                                    {pasanganKanan?.rightImage && <img src={pasanganKanan.rightImage} className="h-8 inline-block rounded border" />}
+                                    <span>{siswaPilih || "Tidak dijawab"}</span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          ) : Array.isArray(studentAns) ? (
                             <ul className="list-disc pl-4">
                               {studentAns.length > 0 ? studentAns.map((a, idx) => <li key={idx} dangerouslySetInnerHTML={{ __html: a }} />) : "Tidak dijawab"}
                             </ul>
@@ -428,17 +442,36 @@ export default function HasilUjianPage() {
                         </div>
                       </div>
                       
+                      {/* KOTAK KUNCI JAWABAN */}
                       {!isEssay && (
                         <div className="p-3 rounded-lg border bg-slate-50 border-slate-200">
                           <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Kunci Jawaban</p>
                           <div className="text-slate-800 prose prose-sm max-w-none">
-                            {q.type === "complex_mc" ? q.correctAnswers?.map((a, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: a }} />)
-                            : q.type === "true_false" ? (q.trueFalseAnswer ? "Benar" : "Salah")
-                            : q.type === "short_answer" ? q.acceptedAnswers?.map((a, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: a }} />)
-                            : q.type === "multi_true_false" ? "Lihat Pernyataan"
-                            : q.type === "matching" ? "Lihat Pasangan"
-                            : q.type === "ordering" ? q.items?.map((item, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: item }} />)
-                            : <div dangerouslySetInnerHTML={{ __html: q.correctAnswer || "-" }} />}
+                            {q.type === "matching" && q.pairs ? (
+                              <ul className="list-disc pl-4 space-y-1">
+                                {q.pairs.map((p, idx) => (
+                                  <li key={idx} className="text-sm flex items-center gap-2 flex-wrap">
+                                    {p.leftImage && <img src={p.leftImage} className="h-8 inline-block rounded border" />}
+                                    <span>{p.left}</span>
+                                    <span className="font-bold">→</span>
+                                    {p.rightImage && <img src={p.rightImage} className="h-8 inline-block rounded border" />}
+                                    <span>{p.right}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : q.type === "complex_mc" ? (
+                              q.correctAnswers?.map((a, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: a }} />)
+                            ) : q.type === "true_false" ? (
+                              q.trueFalseAnswer ? "Benar" : "Salah"
+                            ) : q.type === "short_answer" ? (
+                              q.acceptedAnswers?.map((a, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: a }} />)
+                            ) : q.type === "multi_true_false" ? (
+                              "Lihat Pernyataan"
+                            ) : q.type === "ordering" ? (
+                              q.items?.map((item, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: item }} />)
+                            ) : (
+                              <div dangerouslySetInnerHTML={{ __html: q.correctAnswer || "-" }} />
+                            )}
                           </div>
                         </div>
                       )}

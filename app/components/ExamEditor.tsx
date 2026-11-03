@@ -437,14 +437,50 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 )}
 
-                {editingQuestion.type === "matching" && (
-                  <div className="space-y-3">
+                                {editingQuestion.type === "matching" && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-slate-500">Masukkan pasangan soal dan jawaban. Anda bisa menambahkan gambar.</p>
                     {editingQuestion.pairs?.map((p, i) => (
-                      <div key={i} className="flex gap-2 items-center">
-                        <input value={p.left} onChange={(e) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].left = e.target.value; setEditingQuestion({...editingQuestion, pairs: pr}) }} placeholder="Kiri (Soal)" className="flex-1 px-3 py-2 border rounded-lg" />
-                        <span className="text-slate-400">→</span>
-                        <input value={p.right} onChange={(e) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].right = e.target.value; setEditingQuestion({...editingQuestion, pairs: pr}) }} placeholder="Kanan (Jawaban)" className="flex-1 px-3 py-2 border rounded-lg" />
-                        <button onClick={() => { const pr = editingQuestion.pairs?.filter((_,idx) => idx !== i); setEditingQuestion({...editingQuestion, pairs: pr}) }} className="text-red-500"><Trash2 className="w-4 h-4"/></button>
+                      <div key={i} className="flex flex-col gap-2 p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
+                        <div className="flex gap-2 items-center">
+                          <span className="w-6 text-center font-bold text-slate-400">{i+1}.</span>
+                          
+                          {/* KIRI */}
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input 
+                                value={p.left} 
+                                onChange={(e) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].left = e.target.value; setEditingQuestion({...editingQuestion, pairs: pr}) }} 
+                                placeholder="Teks Kiri (Soal)" 
+                                className="flex-1 px-3 py-2 border rounded-lg text-sm" 
+                              />
+                              <button onClick={() => setShowOptImage(prev => ({...prev, [`match-L-${i}`]: !prev[`match-L-${i}`]}))} className={`p-2 rounded-lg border ${showOptImage[`match-L-${i}`] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 hover:bg-slate-100'}`} title="Gambar Kiri"><ImageIcon className="w-4 h-4"/></button>
+                            </div>
+                            {showOptImage[`match-L-${i}`] && (
+                              <ImageUploader value={p.leftImage} onChange={(img) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].leftImage = img; setEditingQuestion({...editingQuestion, pairs: pr}) }} />
+                            )}
+                          </div>
+
+                          <span className="text-slate-400">↔</span>
+
+                          {/* KANAN */}
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input 
+                                value={p.right} 
+                                onChange={(e) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].right = e.target.value; setEditingQuestion({...editingQuestion, pairs: pr}) }} 
+                                placeholder="Teks Kanan (Jawaban)" 
+                                className="flex-1 px-3 py-2 border rounded-lg text-sm" 
+                              />
+                              <button onClick={() => setShowOptImage(prev => ({...prev, [`match-R-${i}`]: !prev[`match-R-${i}`]}))} className={`p-2 rounded-lg border ${showOptImage[`match-R-${i}`] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 hover:bg-slate-100'}`} title="Gambar Kanan"><ImageIcon className="w-4 h-4"/></button>
+                            </div>
+                            {showOptImage[`match-R-${i}`] && (
+                              <ImageUploader value={p.rightImage} onChange={(img) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].rightImage = img; setEditingQuestion({...editingQuestion, pairs: pr}) }} />
+                            )}
+                          </div>
+
+                          <button onClick={() => { const pr = editingQuestion.pairs?.filter((_,idx) => idx !== i); setEditingQuestion({...editingQuestion, pairs: pr}) }} className="text-red-500 p-2 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                        </div>
                       </div>
                     ))}
                     <Button variant="secondary" size="sm" onClick={() => setEditingQuestion({...editingQuestion, pairs: [...(editingQuestion.pairs||[]), {left:"", right:""}]})}><Plus className="w-3 h-3 mr-1"/>Tambah Pasangan</Button>

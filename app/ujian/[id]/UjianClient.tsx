@@ -656,17 +656,37 @@ export function UjianClient() {
                 );
               })}
 
-              {soal.type === "matching" && (
-                <div className="space-y-3">
+                            {soal.type === "matching" && (
+                <div className="space-y-4">
                   {soal.pairs?.map((p, i) => {
                     const curr = ans || {};
+                    const selectedRight = curr[p.left];
+                    
                     return (
-                      <div key={i} className="flex flex-col sm:flex-row gap-4 items-center">
-                        <div className="rich-text-content flex-1 w-full p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl text-base text-slate-200 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" dangerouslySetInnerHTML={{ __html: p.left }} />
-                        <select onChange={(e) => updateJawaban(soal.id, {...curr, [p.left]: e.target.value})} value={curr[p.left] || ""} className="flex-1 w-full p-4 rounded-xl border-2 border-slate-600 bg-slate-800 text-base text-white focus:border-amber-400 focus:outline-none">
-                          <option value="" disabled>-- Pilih Pasangan --</option>
-                          {soal.pairs?.map(pr => <option key={pr.right} value={pr.right}>{pr.right.replace(/<[^>]*>?/gm, '')}</option>)}
-                        </select>
+                      <div key={i} className="flex flex-col gap-3 p-4 bg-slate-900/50 border-2 border-slate-600 rounded-2xl">
+                        {/* BAGIAN KIRI */}
+                        <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
+                          <span className="w-6 text-center font-bold text-amber-400">{i+1}.</span>
+                          {p.leftImage && <img src={p.leftImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1" />}
+                          {p.left && <div className="rich-text-content flex-1 text-base text-slate-200" dangerouslySetInnerHTML={{ __html: p.left }} />}
+                        </div>
+
+                        {/* BAGIAN KANAN (PILIHAN) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                          {soal.pairs?.map((opt, idx) => {
+                            const isSelected = selectedRight === opt.right;
+                            return (
+                              <button 
+                                key={idx}
+                                onClick={() => updateJawaban(soal.id, {...curr, [p.left]: opt.right})}
+                                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${isSelected ? "border-amber-400 bg-amber-400/10" : "border-slate-700 bg-slate-800 hover:border-slate-500"}`}
+                              >
+                                {opt.rightImage && <img src={opt.rightImage} className="h-12 w-12 object-contain bg-white rounded-lg p-1 shrink-0" />}
+                                {opt.right && <div className={`rich-text-content text-sm flex-1 ${isSelected ? 'text-amber-100' : 'text-slate-300'}`} dangerouslySetInnerHTML={{ __html: opt.right }} />}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     );
                   })}

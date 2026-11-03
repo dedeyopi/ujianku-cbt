@@ -27,7 +27,7 @@ export type Question = {
   statements?: { text: string; isTrue: boolean }[];
   
   // Menjodohkan
-  pairs?: { left: string; right: string }[];
+  pairs?: { left: string; right: string; leftImage?: string; rightImage?: string }[];
   
   // Mengurutkan
   items?: string[]; 

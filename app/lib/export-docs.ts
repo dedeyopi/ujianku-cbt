@@ -37,16 +37,12 @@ export async function exportToWord(exam: Exam) {
   // --- KOP IDENTITAS APLIKASI ---
   children.push(
     new Paragraph({
-      children: [
-        new TextRun({ text: "UjianKu - CBT", bold: true, size: 28, color: "2563eb" }),
-      ],
+      children: [new TextRun({ text: "UjianKu - CBT", bold: true, size: 28, color: "2563eb" })],
       alignment: AlignmentType.CENTER,
       spacing: { after: 100 },
     }),
     new Paragraph({
-      children: [
-        new TextRun({ text: "Platform Ujian Digital Mandiri", italics: true, size: 20, color: "64748b" }),
-      ],
+      children: [new TextRun({ text: "Platform Ujian Digital Mandiri", italics: true, size: 20, color: "64748b" })],
       alignment: AlignmentType.CENTER,
       spacing: { after: 400 },
     })
@@ -108,7 +104,6 @@ export async function exportToWord(exam: Exam) {
         const opt = q.options![i];
         const optImg = q.optionImages?.[i];
 
-        // Teks Opsi
         children.push(
           new Paragraph({
             children: [
@@ -119,7 +114,6 @@ export async function exportToWord(exam: Exam) {
           })
         );
 
-        // Gambar Opsi (Jika ada)
         if (optImg) {
           try {
             const base64Img = await getBase64ImageFromUrl(optImg);
@@ -146,9 +140,33 @@ export async function exportToWord(exam: Exam) {
       });
     } else if (q.type === "matching") {
       children.push(new Paragraph({ text: "Jodohkan pernyataan berikut:", indent: { left: 400 } }));
-      q.pairs?.forEach((p, i) => {
-        children.push(new Paragraph({ text: `${i + 1}. ${cleanText(p.left)}  -----  ( ... ) ${cleanText(p.right)}`, indent: { left: 400 } }));
-      });
+      for (let i = 0; i < (q.pairs?.length || 0); i++) {
+        const p = q.pairs![i];
+        
+        children.push(new Paragraph({ 
+          text: `${i + 1}. ${cleanText(p.left)}  -----  ( ... ) ${cleanText(p.right)}`,
+          indent: { left: 400 },
+        }));
+
+        // Gambar Kiri
+        if (p.leftImage) {
+          try {
+            const base64Img = await getBase64ImageFromUrl(p.leftImage);
+            const imgBuffer = await fetch(base64Img).then(res => res.arrayBuffer());
+            const imgType = base64Img.includes("data:image/png") ? "png" : "jpg";
+            children.push(new Paragraph({ children: [new ImageRun({ data: imgBuffer, transformation: { width: 100, height: 100 }, type: imgType })], indent: { left: 600 }, spacing: { after: 100 } }));
+          } catch (e) {}
+        }
+        // Gambar Kanan
+        if (p.rightImage) {
+          try {
+            const base64Img = await getBase64ImageFromUrl(p.rightImage);
+            const imgBuffer = await fetch(base64Img).then(res => res.arrayBuffer());
+            const imgType = base64Img.includes("data:image/png") ? "png" : "jpg";
+            children.push(new Paragraph({ children: [new ImageRun({ data: imgBuffer, transformation: { width: 100, height: 100 }, type: imgType })], indent: { left: 600 }, spacing: { after: 100 } }));
+          } catch (e) {}
+        }
+      }
     } else if (q.type === "ordering") {
       children.push(new Paragraph({ text: "Urutkan item berikut:", indent: { left: 400 } }));
       q.items?.forEach((item) => {
@@ -244,26 +262,19 @@ export async function exportToPDF(exam: Exam) {
         const opt = q.options![i];
         const optImg = q.optionImages?.[i];
 
-        // Teks Opsi
         const optText = `${String.fromCharCode(65 + i)}. ${cleanText(opt)}`;
         const splitOpt = doc.splitTextToSize(optText, maxLineWidth - 10);
         doc.text(splitOpt, margin + 5, yPos);
         yPos += splitOpt.length * 6;
 
-        // Gambar Opsi (Jika Ada)
         if (optImg) {
           try {
             const base64Img = await getBase64ImageFromUrl(optImg);
             const imgFormat = base64Img.includes("data:image/png") ? 'PNG' : 'JPEG';
-            
-            // Beri jarak sedikit di bawah teks opsi
             yPos += 2;
-            
             if (yPos > 230) { doc.addPage(); yPos = 20; }
-            
-            // Render gambar opsi (lebih kecil dari gambar soal)
             doc.addImage(base64Img, imgFormat, margin + 10, yPos, 40, 30);
-            yPos += 35; // Geser Y untuk opsi berikutnya
+            yPos += 35;
           } catch (e) {
             doc.setFont("helvetica", "italic");
             doc.text("[Gagal memuat gambar opsi]", margin + 10, yPos);
@@ -285,13 +296,32 @@ export async function exportToPDF(exam: Exam) {
         yPos += splitSt.length * 6;
       });
     } else if (q.type === "matching") {
-      q.pairs?.forEach((p, i) => {
+      for (let i = 0; i < (q.pairs?.length || 0); i++) {
         if (yPos > 275) { doc.addPage(); yPos = 20; }
+        const p = q.pairs![i];
+        
         const pairText = `${i + 1}. ${cleanText(p.left)}  -----  ( ... ) ${cleanText(p.right)}`;
         const splitPair = doc.splitTextToSize(pairText, maxLineWidth - 10);
         doc.text(splitPair, margin + 5, yPos);
         yPos += splitPair.length * 6;
-      });
+
+        if (p.leftImage || p.rightImage) {
+           if (yPos > 230) { doc.addPage(); yPos = 20; }
+           if (p.leftImage) {
+             try {
+                const b64 = await getBase64ImageFromUrl(p.leftImage);
+                doc.addImage(b64, b64.includes("png") ? 'PNG' : 'JPEG', margin + 10, yPos, 25, 25);
+             } catch(e){}
+           }
+           if (p.rightImage) {
+             try {
+                const b64 = await getBase64ImageFromUrl(p.rightImage);
+                doc.addImage(b64, b64.includes("png") ? 'PNG' : 'JPEG', margin + 60, yPos, 25, 25);
+             } catch(e){}
+           }
+           yPos += 30;
+        }
+      }
     } else if (q.type === "ordering") {
       q.items?.forEach((item) => {
         if (yPos > 275) { doc.addPage(); yPos = 20; }
@@ -312,7 +342,7 @@ export async function exportToPDF(exam: Exam) {
       yPos += 8;
     }
 
-    yPos += 6; // Jarak antar soal
+    yPos += 6; 
   }
 
   doc.save(`Soal_${exam.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);

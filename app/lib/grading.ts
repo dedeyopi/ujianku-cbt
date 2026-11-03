@@ -30,9 +30,13 @@ export function hitungPoinSoal(q: Question, jawabanSiswa: any): number {
       const benarSt = q.statements.filter((st, i) => jawabanSiswa[i] === st.isTrue).length;
       return benarSt / q.statements.length;
       
-    case "matching":
-      if (!q.pairs || q.pairs.length === 0) return 0;
-      const benarPair = q.pairs.filter(p => jawabanSiswa[p.left] === p.right).length;
+        case "matching":
+      if (!q.pairs || q.pairs.length === 0 || !jawabanSiswa) return 0;
+      const benarPair = q.pairs.filter(p => {
+        // Pengecekan berdasarkan teks 'left' sebagai identifier unik
+        const jawabanSiswaUntukKiri = jawabanSiswa[p.left];
+        return jawabanSiswaUntukKiri === p.right;
+      }).length;
       return benarPair / q.pairs.length;
       
     case "ordering":
