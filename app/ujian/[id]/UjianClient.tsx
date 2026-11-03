@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Maximize, Lock, Loader2, Clock, ArrowRight } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Lock, Loader2, Clock, ArrowRight, LayoutGrid, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { getSession, saveSession, clearSession } from "../../lib/session";
 import { fetchExamForStudent, syncActiveSession, removeActiveSession } from "../../lib/db";
@@ -55,13 +55,13 @@ export function UjianClient() {
   const [jawaban, setJawaban] = useState<Record<string, any>>({});
   const [sisaWaktu, setSisaWaktu] = useState(0);
   const [violations, setViolations] = useState(0);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   const [showStartPrompt, setShowStartPrompt] = useState(true);
   const [isResume, setIsResume] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [selesai, setSelesai] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showNavModal, setShowNavModal] = useState(false); // State untuk Pop-up Navigasi
   
   const [studentData, setStudentData] = useState<{ id: string; className: string } | null>(null);
 
@@ -222,12 +222,6 @@ export function UjianClient() {
   }, [sisaWaktu, exam, showStartPrompt, selesai]);
 
   useEffect(() => {
-    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", handleFsChange);
-    return () => document.removeEventListener("fullscreenchange", handleFsChange);
-  }, []);
-
-  useEffect(() => {
     if (!exam || showStartPrompt || selesai) return;
     const handleVisibility = () => {
       if (document.hidden) {
@@ -335,6 +329,46 @@ export function UjianClient() {
   return (
     <div className="h-screen w-full bg-[#0B1120] p-4 sm:p-6 font-sans flex flex-col overflow-hidden" style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }}>
       
+      {/* MODAL NAVIGASI SOAL */}
+      {showNavModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-slate-800 border border-slate-700 shadow-2xl rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col animate-fade-in-up">
+            <div className="p-5 border-b border-slate-700 flex justify-between items-center bg-slate-900 rounded-t-3xl">
+              <div>
+                <h3 className="text-lg font-bold text-white">Navigasi Soal</h3>
+                <p className="text-xs text-slate-400">{exam.questions.length} Butir Soal</p>
+              </div>
+              <button onClick={() => setShowNavModal(false)} className="p-2 bg-slate-800 text-slate-400 hover:text-white rounded-full transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              <div className="grid grid-cols-5 gap-3">
+                {exam.questions.map((q, i) => {
+                  const answered = jawaban[q.id] !== undefined && (Array.isArray(jawaban[q.id]) ? jawaban[q.id].length > 0 : jawaban[q.id] !== "");
+                  return (
+                    <button 
+                      key={q.id} 
+                      onClick={() => { setNomorSoal(i); setShowNavModal(false); }} 
+                      className={`h-11 rounded-xl font-bold text-base transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}
+                    >
+                      {i+1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-slate-700 flex justify-between items-center bg-slate-900 rounded-b-3xl text-xs font-medium text-slate-400">
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-amber-400"></div> Aktif</div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-500/50"></div> Dijawab</div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-slate-900 border border-slate-700"></div> Kosong</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showWarning && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
           <div className="p-8 max-w-md w-full bg-slate-800 border-2 border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-fade-in-up rounded-3xl">
@@ -397,10 +431,10 @@ export function UjianClient() {
           </div>
         </aside>
 
-        {/* AREA SOAL (KANAN & MOBILE) */}
+        {/* AREA SOAL */}
         <main className="flex-1 flex flex-col h-full overflow-hidden">
           
-          {/* HEADER MOBILE (PESERTA & TIMER) */}
+          {/* HEADER MOBILE (PESERTA, TIMER, & TOMBOL NAVIGASI) */}
           <div className="lg:hidden p-4 mb-4 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
@@ -408,13 +442,21 @@ export function UjianClient() {
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Peserta</p>
-                <p className="font-bold text-white text-sm truncate max-w-[120px]">{nama}</p>
+                <p className="font-bold text-white text-sm truncate max-w-[100px]">{nama}</p>
               </div>
             </div>
-            <div className="text-right bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700">
-              <p className={`font-black text-xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-400"}`}>
-                {Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}
-              </p>
+            
+            <div className="flex items-center gap-3">
+              {/* TOMBOL NAVIGASI SOAL (MOBILE) */}
+              <button onClick={() => setShowNavModal(true)} className="p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-amber-400 hover:bg-slate-700 transition shadow-sm">
+                <LayoutGrid className="w-5 h-5" />
+              </button>
+              
+              <div className="text-right bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700">
+                <p className={`font-black text-xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-400"}`}>
+                  {Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -424,7 +466,6 @@ export function UjianClient() {
               {savedFlash && <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fade-in-up"><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
             </div>
             
-            {/* PERTANYAAN SOAL */}
             <div 
               className="rich-text-content soal-pertanyaan font-medium text-white mb-10 shrink-0 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
               dangerouslySetInnerHTML={{ __html: soal.question }} 
@@ -546,23 +587,7 @@ export function UjianClient() {
             </div>
           </div>
 
-          {/* --- NAVIGASI SOAL MOBILE (KHUSUS HP) --- */}
-          <div className="lg:hidden bg-slate-800 border border-slate-700 shadow-lg rounded-2xl p-4 shrink-0 mb-4">
-            <div className="flex justify-between items-center mb-3">
-              <p className="text-xs font-semibold text-slate-300">Navigasi Soal</p>
-              <p className="text-[10px] text-slate-500">{exam.questions.length} Butir</p>
-            </div>
-            <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-32 overflow-y-auto pr-1 content-start">
-              {exam.questions.map((q, i) => {
-                const answered = jawaban[q.id] !== undefined && (Array.isArray(jawaban[q.id]) ? jawaban[q.id].length > 0 : jawaban[q.id] !== "");
-                return (
-                  <button key={q.id} onClick={() => setNomorSoal(i)} className={`h-9 rounded-lg font-bold text-xs transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* TOMBOL AKSI BAWAH */}
+          {/* TOMBOL AKSI BAWAH (TANPA NAVIGASI SOAL) */}
           <div className="flex justify-between gap-4 shrink-0">
             <button 
               onClick={() => setNomorSoal(n => Math.max(0, n-1))} 
