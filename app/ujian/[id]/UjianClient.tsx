@@ -53,6 +53,7 @@ export function UjianClient() {
 
   const [exam, setExam] = useState<Exam | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); // State untuk tombol refresh
   const [nama, setNama] = useState("");
   const [nomorSoal, setNomorSoal] = useState(0);
   const [jawaban, setJawaban] = useState<Record<string, any>>({});
@@ -75,7 +76,6 @@ export function UjianClient() {
   const skipAutoSaveRef = useRef(true);
   const tabIdRef = useRef<string>("");
 
-  // Inisialisasi Tab ID unik
   useEffect(() => {
     let tid = sessionStorage.getItem("ujianku_tab_id");
     if (!tid) {
@@ -85,93 +85,109 @@ export function UjianClient() {
     tabIdRef.current = tid;
   }, []);
 
-  // Muat data ujian & sesi
-  useEffect(() => {
-    async function loadExam() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/siswa/login"); return; }
+  const loadInitialData = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { router.push("/siswa/login"); return; }
 
-      const { data: profile } = await supabase.from("users").select("full_name, class_name").eq("id", user.id).single();
-      if (!profile) { router.push("/siswa/login"); return; }
+    const { data: profile } = await supabase.from("users").select("full_name, class_name").eq("id", user.id).single();
+    if (!profile) { router.push("/siswa/login"); return; }
 
-      const { data: existingResult } = await supabase.from("results").select("id").eq("exam_id", examId).eq("student_id", user.id).maybeSingle();
-      if (existingResult) { alert("Anda sudah mengerjakan ujian ini."); router.push("/siswa"); return; }
+    const { data: existingResult } = await supabase.from("results").select("id").eq("exam_id", examId).eq("student_id", user.id).maybeSingle();
+    if (existingResult) { alert("Anda sudah mengerjakan ujian ini."); router.push("/siswa"); return; }
 
-      const found = await fetchExamForStudent(examId);
-      if (!found || !found.isActive) { router.push("/siswa"); return; }
+    const found = await fetchExamForStudent(examId);
+    if (!found || !found.isActive) { router.push("/siswa"); return; }
 
-      const sessionId = `${examId}_${user.id}`;
-      const tabId = tabIdRef.current;
+    const sessionId = `${examId}_${user.id}`;
+    const tabId = tabIdRef.current;
+    
+    const { data: existingSession } = await supabase.from("active_sessions").select("*").eq("id", sessionId).single();
+    
+    let startedAt = new Date().toISOString();
+
+    if (existingSession) {
+      const isOtherDeviceActive = (Date.now() - new Date(existingSession.last_seen).getTime() < 15000) && existingSession.tab_id !== tabId;
       
-      const { data: existingSession } = await supabase.from("active_sessions").select("*").eq("id", sessionId).single();
-      
-      let startedAt = new Date().toISOString();
-
-      if (existingSession) {
-        const isOtherDeviceActive = (Date.now() - new Date(existingSession.last_seen).getTime() < 15000) && existingSession.tab_id !== tabId;
-        
-        if (isOtherDeviceActive) {
-          alert("Ujian ini sedang dikerjakan di perangkat/tab lain. Silakan tutup perangkat tersebut atau tunggu 15 detik untuk mengambil alih.");
-          router.push("/siswa");
-          return;
-        }
-
-        startedAt = existingSession.started_at;
-        await supabase.from("active_sessions").update({ tab_id: tabId, last_seen: new Date().toISOString() }).eq("id", sessionId);
-
-        // Cek jika sebelumnya sudah terkunci karena pelanggaran
-        if (existingSession.violations >= 3) {
-          setIsExamLocked(true);
-          setSelesai(true);
-        }
-      } else {
-        await supabase.from("active_sessions").insert({
-          id: sessionId, exam_id: examId, student_id: user.id,
-          student_name: profile.full_name, class_name: profile.class_name || "-",
-          current_question: 1, total_questions: found.questions.length,
-          violations: 0, last_seen: new Date().toISOString(),
-          started_at: startedAt, tab_id: tabId
-        });
+      if (isOtherDeviceActive) {
+        alert("Ujian ini sedang dikerjakan di perangkat/tab lain.");
+        router.push("/siswa");
+        return;
       }
 
-      const randomizedExam = getRandomizedExam(found, user.id);
-      setExam(randomizedExam);
-      setNama(profile.full_name);
-      setStudentData({ id: user.id, className: profile.class_name || "-" });
+      startedAt = existingSession.started_at;
+      await supabase.from("active_sessions").update({ tab_id: tabId, last_seen: new Date().toISOString() }).eq("id", sessionId);
 
-      const existing = getSession(examId);
-      if (existing && existing.studentName === profile.full_name) {
-        setJawaban(existing.answers);
-        setViolations(existing.violations);
-        violationsRef.current = existing.violations;
-        
-        const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
-        const sisa = Math.max(0, found.duration - elapsed);
-        setSisaWaktu(sisa);
-        setIsResume(true);
-        if (sisa <= 0) setSelesai(true);
-      } else {
-        const initialAnswers: Record<string, any> = {};
-        randomizedExam.questions.forEach(q => {
-          if (q.type === "ordering" && q.items) initialAnswers[q.id] = shuffleArrayWithSeed(q.items, user.id + q.id);
-        });
-
-        saveSession({
-          examId, studentId: user.id, studentName: profile.full_name,
-          answers: initialAnswers, startedAt: startedAt, violations: 0, lastUpdated: new Date().toISOString()
-        });
-        setJawaban(initialAnswers);
-        
-        const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
-        const sisa = Math.max(0, found.duration - elapsed);
-        setSisaWaktu(sisa);
+      if (existingSession.violations >= 3) {
+        setIsExamLocked(true);
+        setSelesai(true);
       }
-      setLoading(false);
+    } else {
+      await supabase.from("active_sessions").insert({
+        id: sessionId, exam_id: examId, student_id: user.id,
+        student_name: profile.full_name, class_name: profile.class_name || "-",
+        current_question: 1, total_questions: found.questions.length,
+        violations: 0, last_seen: new Date().toISOString(),
+        started_at: startedAt, tab_id: tabId
+      });
     }
-    loadExam();
+
+    const randomizedExam = getRandomizedExam(found, user.id);
+    setExam(randomizedExam);
+    setNama(profile.full_name);
+    setStudentData({ id: user.id, className: profile.class_name || "-" });
+
+    const existing = getSession(examId);
+    if (existing && existing.studentName === profile.full_name) {
+      setJawaban(existing.answers);
+      setViolations(existing.violations);
+      violationsRef.current = existing.violations;
+      
+      const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+      const sisa = Math.max(0, found.duration - elapsed);
+      setSisaWaktu(sisa);
+      setIsResume(true);
+      if (sisa <= 0) setSelesai(true);
+    } else {
+      const initialAnswers: Record<string, any> = {};
+      randomizedExam.questions.forEach(q => {
+        if (q.type === "ordering" && q.items) initialAnswers[q.id] = shuffleArrayWithSeed(q.items, user.id + q.id);
+      });
+
+      saveSession({
+        examId, studentId: user.id, studentName: profile.full_name,
+        answers: initialAnswers, startedAt: startedAt, violations: 0, lastUpdated: new Date().toISOString()
+      });
+      setJawaban(initialAnswers);
+      
+      const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+      const sisa = Math.max(0, found.duration - elapsed);
+      setSisaWaktu(sisa);
+    }
+    setLoading(false);
   }, [examId, router]);
 
-  // Ping server setiap 5 detik (Sinkronisasi Progress ke Live Monitor)
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  // --- FUNGSI REFRESH SOAL (TANPA KELUAR HALAMAN) ---
+  async function handleRefreshSoal() {
+    setIsRefreshing(true);
+    try {
+      const found = await fetchExamForStudent(examId);
+      if (found) {
+        // Acak ulang
+        const randomizedExam = getRandomizedExam(found, studentData?.id || "");
+        setExam(randomizedExam);
+        alert("Soal berhasil diperbarui!");
+      }
+    } catch (e) {
+      alert("Gagal memuat ulang soal.");
+    }
+    setIsRefreshing(false);
+  }
+
+  // Ping server
   useEffect(() => {
     if (!exam || !studentData || showStartPrompt || selesai || isExamLocked) return;
     const sync = async () => {
@@ -179,7 +195,7 @@ export function UjianClient() {
         `${exam.id}_${studentData.id}`, tabIdRef.current, nomorSoal + 1, violations
       );
       if (!success) {
-        alert("Sesi ujian Anda telah berakhir (kemungkinan dikumpulkan atau di-reset oleh guru).");
+        alert("Sesi ujian Anda telah berakhir.");
         router.push("/siswa");
       }
     };
@@ -188,7 +204,6 @@ export function UjianClient() {
     return () => clearInterval(interval);
   }, [exam, studentData, nama, nomorSoal, violations, showStartPrompt, selesai, isExamLocked]);
 
-  // --- FUNGSI PENANGANAN PELANGGARAN ---
   const handleViolation = useCallback((message: string) => {
     if (isExamLocked || selesai || isSubmitting) return;
 
@@ -197,54 +212,42 @@ export function UjianClient() {
     setViolations(newViolationCount);
 
     const s = getSession(examId);
-    if (s) {
-      saveSession({ ...s, violations: newViolationCount, lastUpdated: new Date().toISOString() });
-    }
+    if (s) saveSession({ ...s, violations: newViolationCount, lastUpdated: new Date().toISOString() });
 
-    // Langsung update ke server agar guru tahu saat itu juga
     if (exam && studentData) {
       supabase.from("active_sessions").update({ violations: newViolationCount }).eq("id", `${exam.id}_${studentData.id}`).then();
     }
 
     if (newViolationCount >= 3) {
-      // PELANGGARAN KE-3: KUNCI UJIAN (TIDAK AUTO SUBMIT)
       setIsExamLocked(true);
-      setSelesai(true); // Hentikan timer & interaksi
+      setSelesai(true);
       setShowWarning(false);
     } else {
-      // PELANGGARAN 1 & 2: PERINGATAN
       setShowWarning(true);
     }
   }, [examId, isExamLocked, selesai, isSubmitting, exam, studentData]);
 
-  // Deteksi Keluar Fullscreen
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isFull = !!document.fullscreenElement;
       setIsFullscreen(isFull);
-
       if (!isFull && !showStartPrompt && !selesai && !isSubmitting && !isExamLocked) {
         handleViolation("Anda keluar dari mode layar penuh!");
       }
     };
-
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, [showStartPrompt, selesai, isSubmitting, isExamLocked, handleViolation]);
 
-  // Deteksi Pindah Tab
   useEffect(() => {
     if (!exam || showStartPrompt || selesai || isExamLocked) return;
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        handleViolation("Anda terdeteksi berpindah tab atau meninggalkan halaman ujian.");
-      }
+      if (document.hidden) handleViolation("Anda terdeteksi berpindah tab!");
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [exam, showStartPrompt, selesai, isExamLocked, handleViolation]);
 
-  // Blokir Klik Kanan, Copy, Paste
   useEffect(() => {
     if (showStartPrompt || selesai) return;
     const disableContextMenu = (e: MouseEvent) => e.preventDefault();
@@ -264,7 +267,6 @@ export function UjianClient() {
     };
   }, [showStartPrompt, selesai]);
 
-  // Auto-Save Jawaban
   useEffect(() => {
     if (!exam || skipAutoSaveRef.current) { skipAutoSaveRef.current = false; return; }
     const s = getSession(examId);
@@ -273,10 +275,8 @@ export function UjianClient() {
     setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1200);
   }, [jawaban, exam, examId]);
 
-  // Timer Ujian
   useEffect(() => {
     if (!exam || showStartPrompt || selesai || isExamLocked) return;
-    
     if (exam.endTime) {
       const now = new Date().getTime();
       if (now > new Date(exam.endTime).getTime()) { submitExam(true); return; }
@@ -286,7 +286,6 @@ export function UjianClient() {
     return () => clearTimeout(t);
   }, [sisaWaktu, exam, showStartPrompt, selesai, isExamLocked]);
 
-  // Cek Status Kunci (Dipanggil siswa saat di layar merah)
   async function checkStatus() {
     if (!exam || !studentData) return;
     setIsCheckingStatus(true);
@@ -356,7 +355,7 @@ export function UjianClient() {
     } catch (err: any) {
       alert("Terjadi kesalahan sistem saat mengirim jawaban: " + err.message);
       setIsSubmitting(false);
-      if (auto) alert("Koneksi terputus. Harap sambungkan kembali internet Anda dan refresh halaman ini.");
+      if (auto) alert("Koneksi terputus.");
     }
   }
 
@@ -364,7 +363,6 @@ export function UjianClient() {
     return <div className="min-h-screen flex items-center justify-center bg-[#0B1120]"><Loader2 className="w-8 h-8 animate-spin text-amber-400" /></div>;
   }
 
-  // --- LAYAR KUNCI (JIKA SISWA MELANGGAR 3X) ---
   if (isExamLocked) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-red-950 text-white p-6 font-sans">
@@ -377,20 +375,10 @@ export function UjianClient() {
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4">
-          <button 
-            onClick={checkStatus} 
-            disabled={isCheckingStatus}
-            className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
-          >
-            {isCheckingStatus ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-            Cek Status Kunci
+          <button onClick={checkStatus} disabled={isCheckingStatus} className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg">
+            {isCheckingStatus ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />} Cek Status Kunci
           </button>
-          <button 
-            onClick={() => router.push("/siswa")} 
-            className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition"
-          >
-            Kembali ke Beranda
-          </button>
+          <button onClick={() => router.push("/siswa")} className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition">Kembali ke Beranda</button>
         </div>
       </div>
     );
@@ -442,7 +430,6 @@ export function UjianClient() {
   return (
     <div className="h-screen w-full bg-[#0B1120] p-4 sm:p-6 font-sans flex flex-col overflow-hidden" style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }}>
       
-      {/* MODAL NAVIGASI SOAL */}
       {showNavModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
           <div className="bg-slate-800 border border-slate-700 shadow-2xl rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col animate-fade-in-up">
@@ -455,24 +442,16 @@ export function UjianClient() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
             <div className="p-6 overflow-y-auto">
               <div className="grid grid-cols-5 gap-3">
                 {exam.questions.map((q, i) => {
                   const answered = jawaban[q.id] !== undefined && (Array.isArray(jawaban[q.id]) ? jawaban[q.id].length > 0 : jawaban[q.id] !== "");
                   return (
-                    <button 
-                      key={q.id} 
-                      onClick={() => { setNomorSoal(i); setShowNavModal(false); }} 
-                      className={`h-11 rounded-xl font-bold text-base transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}
-                    >
-                      {i+1}
-                    </button>
+                    <button key={q.id} onClick={() => { setNomorSoal(i); setShowNavModal(false); }} className={`h-11 rounded-xl font-bold text-base transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>
                   );
                 })}
               </div>
             </div>
-            
             <div className="p-4 border-t border-slate-700 flex justify-between items-center bg-slate-900 rounded-b-3xl text-xs font-medium text-slate-400">
               <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-amber-400"></div> Aktif</div>
               <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-500/50"></div> Dijawab</div>
@@ -482,7 +461,6 @@ export function UjianClient() {
         </div>
       )}
 
-      {/* MODAL PERINGATAN PELANGGARAN */}
       {showWarning && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
           <div className="p-8 max-w-md w-full bg-slate-800 border-2 border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-fade-in-up rounded-3xl">
@@ -490,35 +468,19 @@ export function UjianClient() {
               <AlertTriangle className="w-8 h-8 text-red-500 animate-pulse" />
             </div>
             <h3 className="text-2xl font-bold text-white text-center mb-2">Pelanggaran Terdeteksi!</h3>
-            <p className="text-sm text-slate-300 text-center mb-6 leading-relaxed">
-              Anda terdeteksi keluar dari layar ujian atau berpindah tab. Tindakan ini tercatat oleh sistem.
-            </p>
-            
+            <p className="text-sm text-slate-300 text-center mb-6 leading-relaxed">Anda terdeteksi keluar dari layar ujian atau berpindah tab. Tindakan ini tercatat oleh sistem.</p>
             <div className="bg-red-500/10 rounded-xl p-5 text-center mb-6 border border-red-500/20">
               <p className="text-xs font-semibold text-red-400 uppercase tracking-widest mb-1">Peringatan Ke-</p>
               <p className="text-5xl font-black text-red-500">{violations}<span className="text-2xl text-red-400 font-normal"> / 3</span></p>
-              {violations === 2 && (
-                <p className="text-xs font-bold text-red-400 mt-3 animate-pulse">
-                  ⚠️ HATI-HATI! Satu pelanggaran lagi akan mengunci ujian Anda secara permanen.
-                </p>
-              )}
+              {violations === 2 && <p className="text-xs font-bold text-red-400 mt-3 animate-pulse">⚠️ HATI-HATI! Satu pelanggaran lagi akan mengunci ujian Anda secara permanen.</p>}
             </div>
-            
-            <button onClick={() => {
-              if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(() => {});
-              }
-              setShowWarning(false);
-            }} className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition shadow-lg shadow-red-600/30">
-              Saya Mengerti, Kembali ke Ujian
-            </button>
+            <button onClick={() => { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); setShowWarning(false); }} className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition shadow-lg shadow-red-600/30">Saya Mengerti, Kembali ke Ujian</button>
           </div>
         </div>
       )}
 
       <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
         
-        {/* SIDEBAR KIRI (DESKTOP) */}
         <aside className="hidden lg:flex flex-col w-80 shrink-0 h-full gap-4">
           <div className="bg-slate-800 border border-slate-700 shadow-lg rounded-2xl p-5 shrink-0">
             <div className="flex items-center gap-3 mb-4">
@@ -532,9 +494,7 @@ export function UjianClient() {
             </div>
             <div className="bg-slate-900 px-4 py-3 rounded-xl border border-slate-700 text-center">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-center gap-1"><Clock className="w-3.5 h-3.5"/> Sisa Waktu</p>
-              <p className={`font-black text-3xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-400"}`}>
-                {Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}
-              </p>
+              <p className={`font-black text-3xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-400"}`}>{Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}</p>
             </div>
           </div>
 
@@ -543,28 +503,21 @@ export function UjianClient() {
               <p className="text-sm font-semibold text-slate-300">Navigasi Soal</p>
               <p className="text-xs text-slate-500">{exam.questions.length} Butir</p>
             </div>
-            
             <div className="grid grid-cols-5 gap-2 overflow-y-auto pr-1 flex-1 content-start">
               {exam.questions.map((q, i) => {
                 const answered = jawaban[q.id] !== undefined && (Array.isArray(jawaban[q.id]) ? jawaban[q.id].length > 0 : jawaban[q.id] !== "");
-                return (
-                  <button key={q.id} onClick={() => setNomorSoal(i)} className={`h-10 rounded-lg font-bold text-sm transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>
-                );
+                return <button key={q.id} onClick={() => setNomorSoal(i)} className={`h-10 rounded-lg font-bold text-sm transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>;
               })}
             </div>
-            
             <div className="mt-6 pt-4 border-t border-slate-700/50 shrink-0">
-               <button onClick={() => submitExam(false)} className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(52,211,153,0.2)] flex items-center justify-center gap-2">
-                  <CheckCircle2 className="w-4 h-4"/> Selesai & Kirim
-               </button>
+               <button onClick={() => submitExam(false)} className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(52,211,153,0.2)] flex items-center justify-center gap-2"><CheckCircle2 className="w-4 h-4"/> Selesai & Kirim</button>
             </div>
           </div>
         </aside>
 
-        {/* AREA SOAL */}
         <main className="flex-1 flex flex-col h-full overflow-hidden">
           
-          {/* HEADER MOBILE */}
+          {/* HEADER MOBILE + TOMBOL REFRESH */}
           <div className="lg:hidden p-4 mb-4 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
@@ -575,16 +528,15 @@ export function UjianClient() {
                 <p className="font-bold text-white text-sm truncate max-w-[100px]">{nama}</p>
               </div>
             </div>
-            
             <div className="flex items-center gap-3">
+              <button onClick={handleRefreshSoal} disabled={isRefreshing} className="p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-blue-400 hover:bg-slate-700 transition shadow-sm" title="Refresh Soal">
+                <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
               <button onClick={() => setShowNavModal(true)} className="p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-amber-400 hover:bg-slate-700 transition shadow-sm">
                 <LayoutGrid className="w-5 h-5" />
               </button>
-              
               <div className="text-right bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700">
-                <p className={`font-black text-xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-400"}`}>
-                  {Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}
-                </p>
+                <p className={`font-black text-xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-400"}`}>{Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}</p>
               </div>
             </div>
           </div>
@@ -592,14 +544,15 @@ export function UjianClient() {
           <div className="flex-1 bg-slate-800 border border-slate-700 shadow-xl rounded-3xl p-6 sm:p-10 flex flex-col overflow-y-auto mb-4">
             <div className="flex justify-between items-center mb-8 border-b border-slate-700 pb-4 shrink-0">
               <p className="text-sm sm:text-base font-bold text-slate-300 uppercase tracking-wider">Soal {nomorSoal + 1} <span className="text-slate-500 font-normal">dari {exam.questions.length}</span></p>
-              {savedFlash && <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fade-in-up"><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
+              <div className="flex items-center gap-2">
+                {savedFlash && <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fade-in-up"><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
+                <button onClick={handleRefreshSoal} disabled={isRefreshing} className="hidden lg:flex p-1.5 text-xs text-slate-400 hover:text-white bg-slate-900 border border-slate-700 rounded-lg transition items-center gap-1">
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} /> Refresh Soal
+                </button>
+              </div>
             </div>
             
-            <div 
-              className="rich-text-content soal-pertanyaan font-medium text-white mb-10 shrink-0 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" 
-              dangerouslySetInnerHTML={{ __html: soal.question }} 
-            />
-            
+            <div className="rich-text-content soal-pertanyaan font-medium text-white mb-10 shrink-0 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" dangerouslySetInnerHTML={{ __html: soal.question }} />
             {soal.image && <img src={soal.image} className="max-h-64 mb-10 rounded-xl border border-slate-600 shadow-md shrink-0 object-contain self-start" />}
 
             <div className="space-y-4 shrink-0">
@@ -656,36 +609,39 @@ export function UjianClient() {
                 );
               })}
 
-                            {soal.type === "matching" && (
+              {/* UI MENJODOHKAN DENGAN DROPDOWN & TANPA BUG KLIK */}
+              {soal.type === "matching" && (
                 <div className="space-y-4">
                   {soal.pairs?.map((p, i) => {
                     const curr = ans || {};
-                    const selectedRight = curr[p.left];
-                    
+                    const selectedValue = curr[i];
                     return (
-                      <div key={i} className="flex flex-col gap-3 p-4 bg-slate-900/50 border-2 border-slate-600 rounded-2xl">
-                        {/* BAGIAN KIRI */}
-                        <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
+                      <div key={i} className="flex flex-col sm:flex-row gap-4 items-center p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl">
+                        {/* KIRI: Pertanyaan / Gambar Kiri */}
+                        <div className="flex-1 w-full flex items-center gap-3">
                           <span className="w-6 text-center font-bold text-amber-400">{i+1}.</span>
-                          {p.leftImage && <img src={p.leftImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1" />}
+                          {p.leftImage && <img src={p.leftImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1 border border-slate-500" />}
                           {p.left && <div className="rich-text-content flex-1 text-base text-slate-200" dangerouslySetInnerHTML={{ __html: p.left }} />}
                         </div>
-
-                        {/* BAGIAN KANAN (PILIHAN) */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                          {soal.pairs?.map((opt, idx) => {
-                            const isSelected = selectedRight === opt.right;
-                            return (
-                              <button 
-                                key={idx}
-                                onClick={() => updateJawaban(soal.id, {...curr, [p.left]: opt.right})}
-                                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${isSelected ? "border-amber-400 bg-amber-400/10" : "border-slate-700 bg-slate-800 hover:border-slate-500"}`}
-                              >
-                                {opt.rightImage && <img src={opt.rightImage} className="h-12 w-12 object-contain bg-white rounded-lg p-1 shrink-0" />}
-                                {opt.right && <div className={`rich-text-content text-sm flex-1 ${isSelected ? 'text-amber-100' : 'text-slate-300'}`} dangerouslySetInnerHTML={{ __html: opt.right }} />}
-                              </button>
-                            );
-                          })}
+                        
+                        {/* KANAN: Dropdown Pilihan */}
+                        <div className="flex-1 w-full flex items-center gap-2">
+                          <span className="text-slate-500">→</span>
+                          <select 
+                            value={selectedValue || ""} 
+                            onChange={(e) => updateJawaban(soal.id, {...curr, [i]: e.target.value})} 
+                            className={`flex-1 p-3 rounded-lg border-2 bg-slate-800 text-base text-white focus:border-amber-400 focus:outline-none transition ${selectedValue ? 'border-amber-400/50' : 'border-slate-600'}`}
+                          >
+                            <option value="" disabled>-- Pilih Pasangan --</option>
+                            {soal.pairs?.map((pr, idx) => (
+                              <option key={idx} value={pr.right}>{pr.right ? pr.right.replace(/<[^>]*>?/gm, '') : `[Gambar ${idx+1}]`}</option>
+                            ))}
+                          </select>
+                          
+                          {/* Tampilkan gambar dari pilihan yang dipilih */}
+                          {selectedValue && soal.pairs?.find(pr => pr.right === selectedValue)?.rightImage && (
+                            <img src={soal.pairs.find(pr => pr.right === selectedValue)!.rightImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1 border border-slate-500" />
+                          )}
                         </div>
                       </div>
                     );
@@ -722,28 +678,12 @@ export function UjianClient() {
           </div>
 
           <div className="flex justify-between gap-4 shrink-0">
-            <button 
-              onClick={() => setNomorSoal(n => Math.max(0, n-1))} 
-              disabled={nomorSoal===0} 
-              className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-300 bg-slate-800 border-2 border-slate-700 hover:bg-slate-700 disabled:opacity-30 transition flex items-center justify-center gap-2"
-            >
-              <ChevronLeft className="w-5 h-5"/> Sebelumnya
-            </button>
+            <button onClick={() => setNomorSoal(n => Math.max(0, n-1))} disabled={nomorSoal===0} className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-300 bg-slate-800 border-2 border-slate-700 hover:bg-slate-700 disabled:opacity-30 transition flex items-center justify-center gap-2"><ChevronLeft className="w-5 h-5"/> Sebelumnya</button>
             
             {nomorSoal === exam.questions.length - 1 ? (
-              <button 
-                onClick={() => submitExam(false)} 
-                className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.2)] transition flex items-center justify-center gap-2"
-              >
-                <CheckCircle2 className="w-5 h-5"/> Selesai & Kirim
-              </button>
+              <button onClick={() => submitExam(false)} className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.2)] transition flex items-center justify-center gap-2"><CheckCircle2 className="w-5 h-5"/> Selesai & Kirim</button>
             ) : (
-              <button 
-                onClick={() => setNomorSoal(n => Math.min(exam.questions.length-1, n+1))} 
-                className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-amber-400 hover:bg-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.2)] transition flex items-center justify-center gap-2"
-              >
-                Selanjutnya <ChevronRight className="w-5 h-5"/>
-              </button>
+              <button onClick={() => setNomorSoal(n => Math.min(exam.questions.length-1, n+1))} className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-amber-400 hover:bg-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.2)] transition flex items-center justify-center gap-2">Selanjutnya <ChevronRight className="w-5 h-5"/></button>
             )}
           </div>
 

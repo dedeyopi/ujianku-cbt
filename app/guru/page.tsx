@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { 
   FileText, Users, Trophy, Settings, Calendar as CalendarIcon, 
-  ChevronRight, BookOpen, Clock, Plus, CheckCircle2, AlertCircle
+  ChevronRight, BookOpen, Clock, Plus, CheckCircle2, AlertCircle, ChevronLeft
 } from "lucide-react";
 import { fetchExams } from "../lib/db";
 import { supabase } from "../lib/supabase";
@@ -17,6 +18,9 @@ export default function DashboardGuruPage() {
   const [totalStudents, setTotalStudents] = useState(0);
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // State Kalender
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   useEffect(() => {
     async function loadData() {
@@ -35,6 +39,25 @@ export default function DashboardGuruPage() {
     loadData();
   }, [router]);
 
+  // --- LOGIKA KALENDER ---
+  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay(); // 0 (Minggu) - 6 (Sabtu)
+  
+  const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const dayNames = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
+
+  const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+
+  // Cek apakah ada ujian di tanggal tertentu
+  const hasExamOnDate = (day: number) => {
+    const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    return exams.some(e => {
+      const examDate = new Date(e.createdAt);
+      return examDate.getDate() === targetDate.getDate() && examDate.getMonth() === targetDate.getMonth() && examDate.getFullYear() === targetDate.getFullYear();
+    });
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-full"><p className="text-slate-500 animate-pulse">Memuat dashboard...</p></div>;
   }
@@ -51,56 +74,60 @@ export default function DashboardGuruPage() {
         </p>
       </div>
 
-      {/* 2. STAT CARDS */}
+      {/* 2. STAT CARDS (INTERAKTIF) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         
-        {/* Card 1: Total Soal */}
-        <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl p-5 shadow-md text-white relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-indigo-100 text-sm font-medium mb-1">Total Soal</p>
-              <h3 className="text-3xl font-black">{totalQuestions}</h3>
+        <Link href="/guru/bank-soal" className="block group">
+          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl p-5 shadow-md text-white relative overflow-hidden group-hover:scale-[1.02] transition-transform">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-indigo-100 text-sm font-medium mb-1">Total Soal</p>
+                <h3 className="text-3xl font-black">{totalQuestions}</h3>
+              </div>
+              <div className="p-2 bg-white/20 rounded-lg"><FileText className="w-6 h-6" /></div>
             </div>
-            <div className="p-2 bg-white/20 rounded-lg"><FileText className="w-6 h-6" /></div>
+            <div className="mt-4"><span className="text-xs bg-indigo-700/50 px-2 py-1 rounded-md">Seluruh Bank Soal</span></div>
           </div>
-          <div className="mt-4"><span className="text-xs bg-indigo-700/50 px-2 py-1 rounded-md">Seluruh Bank Soal</span></div>
-        </div>
+        </Link>
 
-        {/* Card 2: Total Peserta */}
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 shadow-md text-white relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-emerald-100 text-sm font-medium mb-1">Total Peserta</p>
-              <h3 className="text-3xl font-black">{totalStudents}</h3>
+        <Link href="/guru/siswa" className="block group">
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 shadow-md text-white relative overflow-hidden group-hover:scale-[1.02] transition-transform">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-emerald-100 text-sm font-medium mb-1">Total Peserta</p>
+                <h3 className="text-3xl font-black">{totalStudents}</h3>
+              </div>
+              <div className="p-2 bg-white/20 rounded-lg"><Users className="w-6 h-6" /></div>
             </div>
-            <div className="p-2 bg-white/20 rounded-lg"><Users className="w-6 h-6" /></div>
+            <div className="mt-4"><span className="text-xs bg-emerald-700/50 px-2 py-1 rounded-md">Siswa Terdaftar</span></div>
           </div>
-          <div className="mt-4"><span className="text-xs bg-emerald-700/50 px-2 py-1 rounded-md">Siswa Terdaftar</span></div>
-        </div>
+        </Link>
 
-        {/* Card 3: Total Ujian */}
-        <div className="bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl p-5 shadow-md text-white relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-amber-100 text-sm font-medium mb-1">Total Ujian</p>
-              <h3 className="text-3xl font-black">{exams.length}</h3>
+        <Link href="/guru/ujian" className="block group">
+          <div className="bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl p-5 shadow-md text-white relative overflow-hidden group-hover:scale-[1.02] transition-transform">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-amber-100 text-sm font-medium mb-1">Total Ujian</p>
+                <h3 className="text-3xl font-black">{exams.length}</h3>
+              </div>
+              <div className="p-2 bg-white/20 rounded-lg"><Trophy className="w-6 h-6" /></div>
             </div>
-            <div className="p-2 bg-white/20 rounded-lg"><Trophy className="w-6 h-6" /></div>
+            <div className="mt-4"><span className="text-xs bg-amber-600/50 px-2 py-1 rounded-md">Ujian Dibuat</span></div>
           </div>
-          <div className="mt-4"><span className="text-xs bg-amber-600/50 px-2 py-1 rounded-md">Ujian Dibuat</span></div>
-        </div>
+        </Link>
 
-        {/* Card 4: Sistem */}
-        <div className="bg-gradient-to-br from-sky-400 to-sky-500 rounded-2xl p-5 shadow-md text-white relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sky-100 text-sm font-medium mb-1">Versi Sistem</p>
-              <h3 className="text-3xl font-black">v1.0</h3>
+        <Link href="/guru/pengaturan" className="block group">
+          <div className="bg-gradient-to-br from-sky-400 to-sky-500 rounded-2xl p-5 shadow-md text-white relative overflow-hidden group-hover:scale-[1.02] transition-transform">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sky-100 text-sm font-medium mb-1">Pengaturan</p>
+                <h3 className="text-xl font-black mt-1">Identitas</h3>
+              </div>
+              <div className="p-2 bg-white/20 rounded-lg"><Settings className="w-6 h-6" /></div>
             </div>
-            <div className="p-2 bg-white/20 rounded-lg"><Settings className="w-6 h-6" /></div>
+            <div className="mt-4"><span className="text-xs bg-sky-700/50 px-2 py-1 rounded-md">Ubah Logo & Nama</span></div>
           </div>
-          <div className="mt-4"><span className="text-xs bg-sky-700/50 px-2 py-1 rounded-md">UjianKu Enterprise</span></div>
-        </div>
+        </Link>
       </div>
 
       {/* 3. MAIN CONTENT (TABEL & KALENDER) */}
@@ -168,55 +195,43 @@ export default function DashboardGuruPage() {
         {/* Kalender & Aksi (Kanan) */}
         <div className="space-y-6">
           
-          {/* Kalender Statis (Visual) */}
+          {/* Kalender Dinamis */}
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-base font-bold text-slate-800 flex items-center gap-2"><CalendarIcon className="w-4 h-4 text-blue-500" /> Kalender</h2>
-              <span className="text-xs font-medium text-slate-500">Maret 2026</span>
+              <div className="flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-100 p-1 rounded-lg">
+                <button onClick={prevMonth} className="p-1 hover:bg-white rounded shadow-sm"><ChevronLeft className="w-4 h-4" /></button>
+                <span className="w-24 text-center">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
+                <button onClick={nextMonth} className="p-1 hover:bg-white rounded shadow-sm"><ChevronRight className="w-4 h-4" /></button>
+              </div>
             </div>
+            
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-400 mb-2">
-              <div>Sen</div><div>Sel</div><div>Rab</div><div>Kam</div><div>Jum</div><div>Sab</div><div>Min</div>
+              {dayNames.map(d => <div key={d}>{d}</div>)}
             </div>
+            
             <div className="grid grid-cols-7 gap-1 text-center text-sm text-slate-600">
-              <div className="p-1.5 text-slate-300">23</div>
-              <div className="p-1.5 text-slate-300">24</div>
-              <div className="p-1.5 text-slate-300">25</div>
-              <div className="p-1.5 text-slate-300">26</div>
-              <div className="p-1.5 text-slate-300">27</div>
-              <div className="p-1.5 text-slate-300">28</div>
-              <div className="p-1.5 text-slate-300">29</div>
+              {/* Kosongkan hari sebelum tanggal 1 */}
+              {Array.from({ length: firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1 }).map((_, i) => (
+                <div key={`empty-${i}`} className="p-1.5"></div>
+              ))}
               
-              <div className="p-1.5 text-slate-300">1</div>
-              <div className="p-1.5 text-slate-300">2</div>
-              <div className="p-1.5 text-slate-300">3</div>
-              <div className="p-1.5 text-slate-300">4</div>
-              <div className="p-1.5 text-slate-300">5</div>
-              <div className="p-1.5 text-slate-300">6</div>
-              <div className="p-1.5 text-slate-300">7</div>
-
-              <div className="p-1.5">8</div>
-              <div className="p-1.5">9</div>
-              <div className="p-1.5">10</div>
-              <div className="p-1.5">11</div>
-              <div className="p-1.5">12</div>
-              <div className="p-1.5">13</div>
-              <div className="p-1.5">14</div>
-
-              <div className="p-1.5">15</div>
-              <div className="p-1.5 bg-blue-600 text-white rounded-md shadow-sm">16</div>
-              <div className="p-1.5">17</div>
-              <div className="p-1.5">18</div>
-              <div className="p-1.5">19</div>
-              <div className="p-1.5">20</div>
-              <div className="p-1.5">21</div>
-
-              <div className="p-1.5">22</div>
-              <div className="p-1.5">23</div>
-              <div className="p-1.5">24</div>
-              <div className="p-1.5">25</div>
-              <div className="p-1.5">26</div>
-              <div className="p-1.5">27</div>
-              <div className="p-1.5">28</div>
+              {/* Hari dalam bulan */}
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const day = i + 1;
+                const isToday = new Date().getDate() === day && new Date().getMonth() === currentDate.getMonth() && new Date().getFullYear() === currentDate.getFullYear();
+                const hasEvent = hasExamOnDate(day);
+                
+                return (
+                  <div key={day} className={`p-1.5 rounded-md relative cursor-pointer hover:bg-slate-50 transition ${
+                    isToday ? 'bg-blue-600 text-white font-bold shadow-sm' : ''
+                  }`}>
+                    {day}
+                    {hasEvent && !isToday && <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-amber-400 rounded-full"></div>}
+                    {hasEvent && isToday && <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white rounded-full"></div>}
+                  </div>
+                );
+              })}
             </div>
           </div>
 

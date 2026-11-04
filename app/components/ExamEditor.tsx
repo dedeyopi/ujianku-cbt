@@ -67,7 +67,6 @@ export function ExamEditor({ examId }: Props) {
   const [savedFlash, setSavedFlash] = useState(false);
   const [pilihTipe, setPilihTipe] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  // PERBAIKAN: Ubah tipe key menjadi string agar bisa menerima angka & teks
   const [showOptImage, setShowOptImage] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -217,10 +216,10 @@ export function ExamEditor({ examId }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 pb-20">
-      <header className="bg-white/80 border-b border-slate-200 sticky top-0 z-10 backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => router.push("/guru")}><ArrowLeft className="w-4 h-4 mr-1.5" />Kembali</Button>
+    <main className="h-screen bg-slate-50 flex flex-col overflow-hidden">
+      <header className="bg-white/80 border-b border-slate-200 shrink-0 z-20 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => router.push("/guru/ujian")}><ArrowLeft className="w-4 h-4 mr-1.5" />Kembali</Button>
           <div className="flex items-center gap-3">
             {savedFlash && <span className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Tersimpan</span>}
             <Button variant={exam.isActive ? "success" : "secondary"} size="sm" onClick={() => updateExam({ isActive: !exam.isActive })}>
@@ -230,151 +229,147 @@ export function ExamEditor({ examId }: Props) {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-6 pt-6 space-y-6">
-        <Card className="p-6">
-          <h2 className="font-semibold text-slate-900 mb-4">Info Ujian</h2>
-          <div className="space-y-4">
-            <Input id="title" label="Judul Ujian" value={exam.title} onChange={(e) => updateExam({ title: e.target.value })} />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input id="subject" label="Mata Pelajaran" value={exam.subject} onChange={(e) => updateExam({ subject: e.target.value })} />
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Durasi (menit)</label>
-                <input type="number" min={1} value={Math.floor(exam.duration / 60)} onChange={(e) => updateExam({ duration: Math.max(1, Number(e.target.value) || 1) * 60 })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Waktu Mulai (Opsional)</label>
-                <div className="relative">
-                  <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input type="datetime-local" value={exam.startTime ? new Date(new Date(exam.startTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""} onChange={(e) => updateExam({ startTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Waktu Selesai (Opsional)</label>
-                <div className="relative">
-                  <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input type="datetime-local" value={exam.endTime ? new Date(new Date(exam.endTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""} onChange={(e) => updateExam({ endTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Token Ujian (Opsional)</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Key className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input type="text" value={exam.token || ""} onChange={(e) => updateExam({ token: e.target.value.toUpperCase() })} placeholder="Contoh: X7K9P2" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition font-mono tracking-widest uppercase" maxLength={10} />
-                </div>
-                <Button variant="secondary" onClick={generateToken} type="button">Buat Token</Button>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <div>
-          <div className="flex flex-col sm:flex-row justify-between gap-3 mb-3">
-            <div>
-              <h2 className="font-semibold text-slate-900">Daftar Soal ({exam.questions.length})</h2>
-              <p className="text-xs text-slate-500">Centang soal untuk menyimpannya ke Bank Soal sekaligus.</p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {selectedQs.length > 0 && (
-                <Button variant="secondary" size="sm" onClick={handleBulkSaveToBank} className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 animate-fade-in-up">
-                  <BookMarked className="w-4 h-4 mr-1.5" />Simpan {selectedQs.length} Soal ke Bank
-                </Button>
-              )}
-              <Button variant="secondary" size="sm" onClick={openBank} className="border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"><BookMarked className="w-4 h-4 mr-1.5" />Ambil dari Bank</Button>
-              <Button variant="secondary" size="sm" onClick={downloadTemplateImport}><FileSpreadsheet className="w-4 h-4 mr-1.5 text-slate-600" />Template</Button>
-              <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting}><Upload className="w-4 h-4 mr-1.5 text-slate-600" />{isImporting ? "..." : "Import"}</Button>
-              <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleImportExcel} />
-              
-              {!editingQuestion && !pilihTipe && (
-                <button onClick={() => setPilihTipe(true)} className="inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] px-3 py-1.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"><Plus className="w-4 h-4 mr-1.5" />Tambah</button>
-              )}
-            </div>
-          </div>
-
-          {pilihTipe && (
-            <Card className="p-5 mb-3 border-emerald-200 ring-1 ring-emerald-500/20">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-900">Pilih Tipe Soal</h3>
-                <button onClick={() => setPilihTipe(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {TIPE_SOAL.map((t) => {
-                  const Icon = t.icon;
-                  return (
-                    <button key={t.value} onClick={() => pilihTipeSoal(t.value)} className="p-3 rounded-xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition text-left flex flex-col items-center justify-center gap-2">
-                      <Icon className="w-5 h-5 text-emerald-600" />
-                      <p className="font-semibold text-xs text-slate-900 text-center">{t.label}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
-
-          {exam.questions.length > 0 && (
-            <div className="flex items-center gap-2 mb-2 px-2">
-              <input 
-                type="checkbox" 
-                checked={selectedQs.length === exam.questions.length && exam.questions.length > 0} 
-                onChange={toggleSelectAll} 
-                className="w-4 h-4 rounded accent-emerald-600 cursor-pointer"
-              />
-              <span className="text-sm text-slate-500 font-medium cursor-pointer" onClick={toggleSelectAll}>Pilih Semua Soal</span>
-            </div>
-          )}
-
-          {exam.questions.map((q, index) => (
-            <Card key={q.id} className={`p-4 mb-3 transition ${selectedQs.includes(q.id) ? 'border-blue-400 ring-1 ring-blue-500/20 bg-blue-50/10' : ''}`}>
-              <div className="flex items-start gap-3">
-                <input 
-                  type="checkbox" 
-                  checked={selectedQs.includes(q.id)} 
-                  onChange={() => toggleSelect(q.id)} 
-                  className="w-5 h-5 mt-1 rounded accent-emerald-600 cursor-pointer shrink-0"
-                />
-                
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">{index + 1}</div>
-                
-                <div className="flex-1 min-w-0">
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 uppercase mb-2 inline-block">{TIPE_LABEL[q.type]}</span>
-                  <div className="font-medium text-slate-900 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.question }} />
-                  {q.image && <img src={q.image} className="max-h-24 rounded-lg border border-slate-200 mb-2" />}
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <button onClick={() => openEditQuestion(q)} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg"><Edit3 className="w-4 h-4" /></button>
-                  <button onClick={() => deleteQuestion(q.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-                </div>
-              </div>
-            </Card>
-          ))}
-
-          {editingQuestion && (
-            <Card className="p-5 mt-3 border-emerald-200 ring-1 ring-emerald-500/20 animate-fade-in-up">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-slate-900">{TIPE_LABEL[editingQuestion.type]}</h3>
-                <button onClick={cancelQuestionForm} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
-              </div>
-
+      {/* LAYOUT SPLIT-SCREEN */}
+      <div className="flex-1 max-w-7xl mx-auto w-full flex flex-col lg:flex-row gap-6 p-6 overflow-hidden">
+        
+        {/* KOLOM KIRI: INFO UJIAN & DAFTAR SOAL (Bisa di-scroll) */}
+        <div className="lg:w-5/12 flex flex-col h-full overflow-hidden">
+          <div className="overflow-y-auto pr-2 space-y-6 pb-10">
+            <Card className="p-6">
+              <h2 className="font-semibold text-slate-900 mb-4">Info Ujian</h2>
               <div className="space-y-4">
+                <Input id="title" label="Judul Ujian" value={exam.title} onChange={(e) => updateExam({ title: e.target.value })} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input id="subject" label="Mata Pelajaran" value={exam.subject} onChange={(e) => updateExam({ subject: e.target.value })} />
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Durasi (menit)</label>
+                    <input type="number" min={1} value={Math.floor(exam.duration / 60)} onChange={(e) => updateExam({ duration: Math.max(1, Number(e.target.value) || 1) * 60 })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Waktu Mulai</label>
+                    <div className="relative">
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input type="datetime-local" value={exam.startTime ? new Date(new Date(exam.startTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""} onChange={(e) => updateExam({ startTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Waktu Selesai</label>
+                    <div className="relative">
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input type="datetime-local" value={exam.endTime ? new Date(new Date(exam.endTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""} onChange={(e) => updateExam({ endTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition" />
+                    </div>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Pertanyaan / Instruksi</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Token Ujian</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Key className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input type="text" value={exam.token || ""} onChange={(e) => updateExam({ token: e.target.value.toUpperCase() })} placeholder="Contoh: X7K9P2" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition font-mono tracking-widest uppercase" maxLength={10} />
+                    </div>
+                    <Button variant="secondary" onClick={generateToken} type="button">Buat Token</Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <div>
+              <div className="flex flex-col sm:flex-row justify-between gap-3 mb-3">
+                <div>
+                  <h2 className="font-semibold text-slate-900">Daftar Soal ({exam.questions.length})</h2>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {selectedQs.length > 0 && (
+                    <Button variant="secondary" size="sm" onClick={handleBulkSaveToBank} className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"><BookMarked className="w-4 h-4 mr-1.5" />Simpan {selectedQs.length}</Button>
+                  )}
+                  <Button variant="secondary" size="sm" onClick={openBank} className="border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"><BookMarked className="w-4 h-4 mr-1.5" />Ambil</Button>
+                  <Button variant="secondary" size="sm" onClick={downloadTemplateImport}><FileSpreadsheet className="w-4 h-4 mr-1.5 text-slate-600" />Template</Button>
+                  <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting}><Upload className="w-4 h-4 mr-1.5 text-slate-600" />{isImporting ? "..." : "Import"}</Button>
+                  <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleImportExcel} />
+                  
+                  {!editingQuestion && !pilihTipe && (
+                    <button onClick={() => setPilihTipe(true)} className="inline-flex items-center justify-center font-semibold rounded-xl transition-all px-3 py-1.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"><Plus className="w-4 h-4 mr-1.5" />Tambah</button>
+                  )}
+                </div>
+              </div>
+
+              {pilihTipe && (
+                <Card className="p-4 mb-3 border-emerald-200 ring-1 ring-emerald-500/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-slate-900 text-sm">Pilih Tipe Soal</h3>
+                    <button onClick={() => setPilihTipe(false)} className="p-1 rounded hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {TIPE_SOAL.map((t) => {
+                      const Icon = t.icon;
+                      return (
+                        <button key={t.value} onClick={() => pilihTipeSoal(t.value)} className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition text-left flex items-center gap-2">
+                          <Icon className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <p className="font-medium text-xs text-slate-900 truncate">{t.label}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+
+              {exam.questions.length > 0 && (
+                <div className="flex items-center gap-2 mb-2 px-1">
+                  <input type="checkbox" checked={selectedQs.length === exam.questions.length && exam.questions.length > 0} onChange={toggleSelectAll} className="w-4 h-4 rounded accent-emerald-600 cursor-pointer" />
+                  <span className="text-xs text-slate-500 font-medium cursor-pointer" onClick={toggleSelectAll}>Pilih Semua</span>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {exam.questions.map((q, index) => (
+                  <Card key={q.id} className={`p-3 transition cursor-pointer hover:border-blue-300 ${editingQuestion?.id === q.id ? 'border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/10' : ''} ${selectedQs.includes(q.id) ? 'border-amber-400 bg-amber-50/10' : ''}`} onClick={() => openEditQuestion(q)}>
+                    <div className="flex items-start gap-2">
+                      <input type="checkbox" checked={selectedQs.includes(q.id)} onChange={(e) => { e.stopPropagation(); toggleSelect(q.id); }} onClick={(e) => e.stopPropagation()} className="w-4 h-4 mt-1 rounded accent-emerald-600 cursor-pointer shrink-0" />
+                      <div className="w-6 h-6 rounded bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">{index + 1}</div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase mb-1 inline-block">{TIPE_LABEL[q.type]}</span>
+                        <div className="font-medium text-sm text-slate-900 truncate" dangerouslySetInnerHTML={{ __html: q.question.replace(/<[^>]*>?/gm, '') || '(Kosong)' }} />
+                      </div>
+                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => openEditQuestion(q)} className="p-1 text-slate-400 hover:bg-slate-100 rounded"><Edit3 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => deleteQuestion(q.id)} className="p-1 text-red-400 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* KOLOM KANAN: FORM EDITOR (Sticky) */}
+        <div className="lg:w-7/12 h-full overflow-hidden">
+          {editingQuestion ? (
+            <Card className="h-full flex flex-col animate-fade-in-up border-emerald-200 shadow-lg">
+              <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50 rounded-t-2xl shrink-0">
+                <h3 className="font-bold text-lg text-slate-900">{TIPE_LABEL[editingQuestion.type]}</h3>
+                <button onClick={cancelQuestionForm} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm"><X className="w-5 h-5" /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Pertanyaan / Instruksi</label>
                   <TextEditor value={editingQuestion.question} onChange={(val) => setEditingQuestion({ ...editingQuestion, question: val })} placeholder="Tulis pertanyaan di sini..." />
                 </div>
                 <ImageUploader value={editingQuestion.image} onChange={(img) => setEditingQuestion({ ...editingQuestion, image: img })} />
 
                 {editingQuestion.type === "multiple_choice" && (
-                  <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div className="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
                     {editingQuestion.options?.map((opt, i) => (
-                      <div key={i} className="flex flex-col gap-2 p-2 bg-white rounded-lg border border-slate-100 shadow-sm">
-                        <div className="flex gap-2 items-center">
+                      <div key={i} className="flex flex-col gap-2 p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
+                        <div className="flex gap-3 items-center">
                           <button onClick={() => setEditingQuestion({...editingQuestion, correctAnswer: opt || `Opsi ${i+1}`})} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ${editingQuestion.correctAnswer === (opt || `Opsi ${i+1}`) ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300"}`}>{editingQuestion.correctAnswer === (opt || `Opsi ${i+1}`) ? <Check className="w-4 h-4"/> : String.fromCharCode(65+i)}</button>
                           <div className="flex-1"><TextEditor value={opt} onChange={(val) => { const o = [...(editingQuestion.options||[])]; o[i] = val; setEditingQuestion({...editingQuestion, options: o, correctAnswer: editingQuestion.correctAnswer === opt ? val : editingQuestion.correctAnswer}) }} placeholder={`Teks Opsi ${String.fromCharCode(65+i)}`} /></div>
-                          <button onClick={() => setShowOptImage(prev => ({...prev, [i.toString()]: !prev[i.toString()]}))} className={`p-2 rounded-lg border ${showOptImage[i.toString()] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} title="Tambah Gambar"><ImageIcon className="w-4 h-4"/></button>
+                          <button onClick={() => setShowOptImage(prev => ({...prev, [i.toString()]: !prev[i.toString()]}))} className={`p-2 rounded-lg border ${showOptImage[i.toString()] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`}><ImageIcon className="w-4 h-4"/></button>
                         </div>
                         {showOptImage[i.toString()] && <div className="mt-2 pl-10"><ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} /></div>}
                       </div>
@@ -383,23 +378,23 @@ export function ExamEditor({ examId }: Props) {
                 )}
 
                 {editingQuestion.type === "complex_mc" && (
-                  <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div className="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
                     <p className="text-xs text-slate-500">Centang lebih dari satu jika perlu.</p>
                     {editingQuestion.options?.map((opt, i) => {
                       const identifier = opt || `Opsi ${i+1}`;
                       const isSelected = editingQuestion.correctAnswers?.includes(identifier);
                       return (
-                        <div key={i} className="flex flex-col gap-2 p-2 bg-white rounded-lg border border-slate-100 shadow-sm">
-                          <div className="flex gap-2 items-center">
+                        <div key={i} className="flex flex-col gap-2 p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
+                          <div className="flex gap-3 items-center">
                             <input type="checkbox" checked={isSelected} onChange={() => {
                               const curr = editingQuestion.correctAnswers || [];
                               const newAns = isSelected ? curr.filter(a => a !== identifier) : [...curr, identifier];
                               setEditingQuestion({...editingQuestion, correctAnswers: newAns});
                             }} className="w-5 h-5 accent-emerald-600 shrink-0" />
                             <div className="flex-1"><TextEditor value={opt} onChange={(val) => { const o = [...(editingQuestion.options||[])]; o[i] = val; setEditingQuestion({...editingQuestion, options: o}) }} placeholder={`Teks Opsi ${String.fromCharCode(65+i)}`} /></div>
-                            <button onClick={() => setShowOptImage(prev => ({...prev, [i.toString()]: !prev[i.toString()]}))} className={`p-2 rounded-lg border ${showOptImage[i.toString()] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} title="Tambah Gambar"><ImageIcon className="w-4 h-4"/></button>
+                            <button onClick={() => setShowOptImage(prev => ({...prev, [i.toString()]: !prev[i.toString()]}))} className={`p-2 rounded-lg border ${showOptImage[i.toString()] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`}><ImageIcon className="w-4 h-4"/></button>
                           </div>
-                          {showOptImage[i.toString()] && <div className="mt-2 pl-8"><ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} /></div>}
+                          {showOptImage[i.toString()] && <div className="mt-2 pl-10"><ImageUploader value={editingQuestion.optionImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.optionImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, optionImages: imgs}) }} /></div>}
                         </div>
                       );
                     })}
@@ -407,9 +402,9 @@ export function ExamEditor({ examId }: Props) {
                 )}
 
                 {editingQuestion.type === "true_false" && (
-                  <div className="flex gap-3">
+                  <div className="flex gap-4">
                     {[true, false].map(val => (
-                      <button key={String(val)} onClick={() => setEditingQuestion({...editingQuestion, trueFalseAnswer: val})} className={`flex-1 py-3 border-2 rounded-xl font-semibold ${editingQuestion.trueFalseAnswer === val ? "bg-emerald-50 border-emerald-500 text-emerald-700" : "border-slate-200"}`}>{val ? "Benar" : "Salah"}</button>
+                      <button key={String(val)} onClick={() => setEditingQuestion({...editingQuestion, trueFalseAnswer: val})} className={`flex-1 py-4 border-2 rounded-xl font-semibold text-lg ${editingQuestion.trueFalseAnswer === val ? "bg-emerald-50 border-emerald-500 text-emerald-700" : "border-slate-200"}`}>{val ? "Benar" : "Salah"}</button>
                     ))}
                   </div>
                 )}
@@ -433,24 +428,17 @@ export function ExamEditor({ examId }: Props) {
                   <div className="space-y-4">
                     <p className="text-xs text-slate-500">Masukkan pasangan soal dan jawaban. Anda bisa menambahkan gambar.</p>
                     {editingQuestion.pairs?.map((p, i) => (
-                      <div key={i} className="flex flex-col gap-2 p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
+                      <div key={i} className="flex flex-col gap-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
                         <div className="flex gap-2 items-center">
                           <span className="w-6 text-center font-bold text-slate-400">{i+1}.</span>
                           
                           {/* KIRI */}
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center gap-2">
-                              <input 
-                                value={p.left} 
-                                onChange={(e) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].left = e.target.value; setEditingQuestion({...editingQuestion, pairs: pr}) }} 
-                                placeholder="Teks Kiri (Soal)" 
-                                className="flex-1 px-3 py-2 border rounded-lg text-sm" 
-                              />
-                              <button onClick={() => setShowOptImage(prev => ({...prev, [`match-L-${i}`]: !prev[`match-L-${i}`]}))} className={`p-2 rounded-lg border ${showOptImage[`match-L-${i}`] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 hover:bg-slate-100'}`} title="Gambar Kiri"><ImageIcon className="w-4 h-4"/></button>
+                              <input value={p.left} onChange={(e) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].left = e.target.value; setEditingQuestion({...editingQuestion, pairs: pr}) }} placeholder="Teks Kiri (Soal)" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
+                              <button onClick={() => setShowOptImage(prev => ({...prev, [`match-L-${i}`]: !prev[`match-L-${i}`]}))} className={`p-2 rounded-lg border ${showOptImage[`match-L-${i}`] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 hover:bg-slate-100'}`}><ImageIcon className="w-4 h-4"/></button>
                             </div>
-                            {showOptImage[`match-L-${i}`] && (
-                              <ImageUploader value={p.leftImage} onChange={(img) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].leftImage = img; setEditingQuestion({...editingQuestion, pairs: pr}) }} />
-                            )}
+                            {showOptImage[`match-L-${i}`] && <ImageUploader value={p.leftImage} onChange={(img) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].leftImage = img; setEditingQuestion({...editingQuestion, pairs: pr}) }} />}
                           </div>
 
                           <span className="text-slate-400">↔</span>
@@ -458,17 +446,10 @@ export function ExamEditor({ examId }: Props) {
                           {/* KANAN */}
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center gap-2">
-                              <input 
-                                value={p.right} 
-                                onChange={(e) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].right = e.target.value; setEditingQuestion({...editingQuestion, pairs: pr}) }} 
-                                placeholder="Teks Kanan (Jawaban)" 
-                                className="flex-1 px-3 py-2 border rounded-lg text-sm" 
-                              />
-                              <button onClick={() => setShowOptImage(prev => ({...prev, [`match-R-${i}`]: !prev[`match-R-${i}`]}))} className={`p-2 rounded-lg border ${showOptImage[`match-R-${i}`] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 hover:bg-slate-100'}`} title="Gambar Kanan"><ImageIcon className="w-4 h-4"/></button>
+                              <input value={p.right} onChange={(e) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].right = e.target.value; setEditingQuestion({...editingQuestion, pairs: pr}) }} placeholder="Teks Kanan (Jawaban)" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
+                              <button onClick={() => setShowOptImage(prev => ({...prev, [`match-R-${i}`]: !prev[`match-R-${i}`]}))} className={`p-2 rounded-lg border ${showOptImage[`match-R-${i}`] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 hover:bg-slate-100'}`}><ImageIcon className="w-4 h-4"/></button>
                             </div>
-                            {showOptImage[`match-R-${i}`] && (
-                              <ImageUploader value={p.rightImage} onChange={(img) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].rightImage = img; setEditingQuestion({...editingQuestion, pairs: pr}) }} />
-                            )}
+                            {showOptImage[`match-R-${i}`] && <ImageUploader value={p.rightImage} onChange={(img) => { const pr = [...(editingQuestion.pairs||[])]; pr[i].rightImage = img; setEditingQuestion({...editingQuestion, pairs: pr}) }} />}
                           </div>
 
                           <button onClick={() => { const pr = editingQuestion.pairs?.filter((_,idx) => idx !== i); setEditingQuestion({...editingQuestion, pairs: pr}) }} className="text-red-500 p-2 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
@@ -511,18 +492,26 @@ export function ExamEditor({ examId }: Props) {
                     Soal esai tidak dinilai otomatis. Siswa akan mengetik jawaban panjang. Guru harus memeriksa dan menilai manual.
                   </div>
                 )}
+              </div>
 
-                <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-slate-100">
-                  <Button variant="secondary" className="flex-1" onClick={cancelQuestionForm}>Batal</Button>
-                  <Button variant="secondary" className="flex-1 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100" onClick={handleSaveToBankSingle}><BookMarked className="w-4 h-4 mr-1.5" />Simpan 1 Soal ke Bank</Button>
-                  <button onClick={saveQuestion} className="flex-1 inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"><Save className="w-4 h-4 mr-1.5" />Simpan Soal</button>
-                </div>
+              <div className="p-5 border-t border-slate-100 bg-slate-50 rounded-b-2xl shrink-0 flex flex-col sm:flex-row gap-2">
+                <Button variant="secondary" className="flex-1" onClick={cancelQuestionForm}>Batal</Button>
+                <Button variant="secondary" className="flex-1 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100" onClick={handleSaveToBankSingle}><BookMarked className="w-4 h-4 mr-1.5" />Simpan ke Bank</Button>
+                <button onClick={saveQuestion} className="flex-1 inline-flex items-center justify-center font-semibold rounded-xl px-5 py-2.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"><Save className="w-4 h-4 mr-1.5" />Simpan Soal</button>
               </div>
             </Card>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100/50 rounded-3xl border-2 border-dashed border-slate-200 p-8 text-center">
+              <Edit3 className="w-16 h-16 text-slate-300 mb-4" />
+              <h3 className="text-xl font-bold text-slate-600 mb-2">Pilih Soal untuk Diedit</h3>
+              <p className="text-sm">Klik salah satu soal di daftar sebelah kiri untuk mulai mengedit, atau buat soal baru.</p>
+            </div>
           )}
         </div>
+
       </div>
 
+      {/* MODAL BANK SOAL */}
       {bankModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 sm:p-6">
           <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col animate-fade-in-up">
