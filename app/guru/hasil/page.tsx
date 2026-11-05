@@ -66,13 +66,10 @@ export default function HasilUjianPage() {
 
   async function handleRefresh() {
     setIsRefreshing(true);
-    
     const allExams = await fetchExams();
     setExams(allExams);
-
     const data = await fetchResultsByExam(selectedExamId);
     setResults(data);
-    
     setIsRefreshing(false);
   }
 
