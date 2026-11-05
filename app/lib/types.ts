@@ -16,7 +16,8 @@ export type Question = {
   
   // PG Tunggal & Kompleks
   options?: string[];
-  optionImages?: (string | undefined)[]; // BARU: Gambar untuk tiap opsi
+  optionImages?: (string | undefined)[];
+  _optIdx?: number[]; // <-- TAMBAHKAN INI UNTUK MELACAK URUTAN ASLI SAAT DIACAK
   correctAnswer?: string;
   correctAnswers?: string[];
   
@@ -26,17 +27,24 @@ export type Question = {
   // B/S Bertingkat
   statements?: { text: string; isTrue: boolean }[];
   
-  // Menjodohkan
-  pairs?: { left: string; right: string; leftImage?: string; rightImage?: string }[];
+  // Menjodohkan (Ditambah Gambar)
+  pairs?: { 
+    left: string; 
+    right: string; 
+    leftImage?: string; 
+    rightImage?: string; 
+  }[];
   
   // Mengurutkan
-  items?: string[]; 
+  items?: string[];
   
   // Isian Singkat
   acceptedAnswers?: string[];
   
   // Esai
   minWords?: number;
+
+  // Bank Soal (Opsional)
   examId?: string | null;
   ownerId?: string;
   subject?: string;
@@ -47,13 +55,13 @@ export type Exam = {
   id: string;
   title: string;
   subject: string;
-  duration: number;
+  duration: number; // dalam detik
   questions: Question[];
   createdAt: string;
   isActive: boolean;
-  token?: string;        // <-- TAMBAHKAN INI
-  startTime?: string;    // <-- TAMBAHKAN INI
-  endTime?: string;      // <-- TAMBAHKAN INI
+  token?: string;
+  startTime?: string;
+  endTime?: string;
 };
 
 export type ExamSession = {
@@ -101,8 +109,8 @@ export type ActiveSession = {
   totalQuestions: number;
   violations: number;
   lastSeen: string;
-  startedAt: string; // <-- TAMBAHKAN INI
-  tabId: string;     // <-- TAMBAHKAN INI
+  startedAt: string;
+  tabId: string;
 };
 
 export type AppSettings = {
