@@ -25,11 +25,8 @@ export function hitungPoinSoal(q: Question, jawabanSiswa: any): number {
       return benarSt / q.statements.length;
     case "matching":
       if (!q.pairs || q.pairs.length === 0) return 0;
-      // Perbaikan: Sekarang jawabanSiswa menyimpan Index (0, 1, 2...) bukan Teks
-      const benarPair = q.pairs.filter((p, i) => {
-        const jawabanSiswaUntukIndexIni = jawabanSiswa[i];
-        return jawabanSiswaUntukIndexIni === p.right;
-      }).length;
+      // Penilaian berdasarkan Index (karena soal tidak diacak lagi)
+      const benarPair = q.pairs.filter((p, i) => jawabanSiswa[i] === p.right).length;
       return benarPair / q.pairs.length;
     case "ordering":
       if (!q.items || !Array.isArray(jawabanSiswa) || q.items.length === 0) return 0;
