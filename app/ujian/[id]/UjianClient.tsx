@@ -27,20 +27,27 @@ function shuffleArrayWithSeed<T>(array: T[], seedString: string): T[] {
 function getRandomizedExam(exam: Exam, studentId: string): Exam {
   const shuffledQuestions = shuffleArrayWithSeed(exam.questions, studentId + exam.id).map(q => {
     const newQ = { ...q };
+    
     if ((newQ.type === "multiple_choice" || newQ.type === "complex_mc") && newQ.options) {
       const qSeed = studentId + q.id;
-      if (newQ.optionImages) {
-        const zipped = newQ.options.map((opt, i) => ({ opt, img: newQ.optionImages![i] }));
-        const shuffled = shuffleArrayWithSeed(zipped, qSeed);
-        newQ.options = shuffled.map(z => z.opt);
-        newQ.optionImages = shuffled.map(z => z.img);
-      } else {
-        newQ.options = shuffleArrayWithSeed(newQ.options, qSeed);
-      }
+      
+      // PERBAIKAN: Simpan originalIdx agar identifier tidak berubah saat diacak
+      const zipped = newQ.options.map((opt, i) => ({ 
+        opt, 
+        img: newQ.optionImages?.[i], 
+        originalIdx: i 
+      }));
+      
+      const shuffled = shuffleArrayWithSeed(zipped, qSeed);
+      newQ.options = shuffled.map(z => z.opt);
+      newQ.optionImages = shuffled.map(z => z.img);
+      newQ._optIdx = shuffled.map(z => z.originalIdx);
     }
+    
     if (newQ.type === "matching" && newQ.pairs) {
       newQ.pairs = shuffleArrayWithSeed(newQ.pairs, studentId + q.id);
     }
+    
     return newQ;
   });
   return { ...exam, questions: shuffledQuestions };
@@ -53,7 +60,7 @@ export function UjianClient() {
 
   const [exam, setExam] = useState<Exam | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false); // State untuk tombol refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [nama, setNama] = useState("");
   const [nomorSoal, setNomorSoal] = useState(0);
   const [jawaban, setJawaban] = useState<Record<string, any>>({});
@@ -170,13 +177,11 @@ export function UjianClient() {
     loadInitialData();
   }, [loadInitialData]);
 
-  // --- FUNGSI REFRESH SOAL (TANPA KELUAR HALAMAN) ---
   async function handleRefreshSoal() {
     setIsRefreshing(true);
     try {
       const found = await fetchExamForStudent(examId);
       if (found) {
-        // Acak ulang
         const randomizedExam = getRandomizedExam(found, studentData?.id || "");
         setExam(randomizedExam);
         alert("Soal berhasil diperbarui!");
@@ -187,7 +192,6 @@ export function UjianClient() {
     setIsRefreshing(false);
   }
 
-  // Ping server
   useEffect(() => {
     if (!exam || !studentData || showStartPrompt || selesai || isExamLocked) return;
     const sync = async () => {
@@ -517,7 +521,6 @@ export function UjianClient() {
 
         <main className="flex-1 flex flex-col h-full overflow-hidden">
           
-          {/* HEADER MOBILE + TOMBOL REFRESH */}
           <div className="lg:hidden p-4 mb-4 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
@@ -557,7 +560,9 @@ export function UjianClient() {
 
             <div className="space-y-4 shrink-0">
               {soal.type === "multiple_choice" && soal.options?.map((opt, i) => {
-                const identifier = opt || `Opsi ${i+1}`;
+                // PERBAIKAN: Gunakan originalIdx
+                const originalIdx = soal._optIdx?.[i] ?? i;
+                const identifier = opt || `Opsi ${originalIdx + 1}`;
                 const img = soal.optionImages?.[i];
                 const isSelected = ans === identifier;
                 return (
@@ -570,7 +575,9 @@ export function UjianClient() {
               })}
 
               {soal.type === "complex_mc" && soal.options?.map((opt, i) => {
-                const identifier = opt || `Opsi ${i+1}`;
+                // PERBAIKAN: Gunakan originalIdx
+                const originalIdx = soal._optIdx?.[i] ?? i;
+                const identifier = opt || `Opsi ${originalIdx + 1}`;
                 const img = soal.optionImages?.[i];
                 const selected = Array.isArray(ans) && ans.includes(identifier);
                 return (
@@ -609,7 +616,6 @@ export function UjianClient() {
                 );
               })}
 
-              {/* UI MENJODOHKAN DENGAN DROPDOWN & TANPA BUG KLIK */}
               {soal.type === "matching" && (
                 <div className="space-y-4">
                   {soal.pairs?.map((p, i) => {
@@ -617,14 +623,12 @@ export function UjianClient() {
                     const selectedValue = curr[i];
                     return (
                       <div key={i} className="flex flex-col sm:flex-row gap-4 items-center p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl">
-                        {/* KIRI: Pertanyaan / Gambar Kiri */}
                         <div className="flex-1 w-full flex items-center gap-3">
                           <span className="w-6 text-center font-bold text-amber-400">{i+1}.</span>
                           {p.leftImage && <img src={p.leftImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1 border border-slate-500" />}
                           {p.left && <div className="rich-text-content flex-1 text-base text-slate-200" dangerouslySetInnerHTML={{ __html: p.left }} />}
                         </div>
                         
-                        {/* KANAN: Dropdown Pilihan */}
                         <div className="flex-1 w-full flex items-center gap-2">
                           <span className="text-slate-500">→</span>
                           <select 
@@ -638,7 +642,6 @@ export function UjianClient() {
                             ))}
                           </select>
                           
-                          {/* Tampilkan gambar dari pilihan yang dipilih */}
                           {selectedValue && soal.pairs?.find(pr => pr.right === selectedValue)?.rightImage && (
                             <img src={soal.pairs.find(pr => pr.right === selectedValue)!.rightImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1 border border-slate-500" />
                           )}
