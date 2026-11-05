@@ -416,23 +416,41 @@ export default function HasilUjianPage() {
                       <div className={`p-3 rounded-lg border ${isEssay ? 'bg-blue-50 border-blue-100 col-span-full' : isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
                         <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Jawaban Siswa</p>
                         <div className="text-slate-800 prose prose-sm max-w-none">
+                          {/* FIX MENJODOHKAN (Membaca berdasarkan Index) */}
                           {q.type === "matching" && q.pairs ? (
                             <ul className="list-disc pl-4 space-y-1">
                               {q.pairs.map((p, idx) => {
-                                const siswaPilih = studentAns ? studentAns[p.left] : null;
+                                const siswaPilih = studentAns ? studentAns[idx] : null; // Baca dari Index
                                 const pasanganKanan = q.pairs?.find(pr => pr.right === siswaPilih);
                                 return (
                                   <li key={idx} className="text-sm flex items-center gap-2 flex-wrap">
                                     {p.leftImage && <img src={p.leftImage} className="h-8 inline-block rounded border" />}
-                                    <span>{p.left}</span>
+                                    <span>{p.left || `Kiri ${idx+1}`}</span>
                                     <span className="font-bold">→</span>
                                     {pasanganKanan?.rightImage && <img src={pasanganKanan.rightImage} className="h-8 inline-block rounded border" />}
-                                    <span>{siswaPilih || "Tidak dijawab"}</span>
+                                    <span className={siswaPilih ? "text-slate-800" : "text-slate-400 italic"}>
+                                      {siswaPilih || "Tidak dijawab"}
+                                    </span>
                                   </li>
                                 );
                               })}
                             </ul>
-                          ) : Array.isArray(studentAns) ? (
+                          ) : 
+                          /* FIX MENGURUTKAN (Tampilkan sebagai list bernomor) */
+                          q.type === "ordering" && q.items ? (
+                            <div>
+                              {Array.isArray(studentAns) && studentAns.length > 0 ? (
+                                <ol className="list-decimal pl-4 space-y-1">
+                                  {studentAns.map((item: string, idx: number) => (
+                                    <li key={idx} dangerouslySetInnerHTML={{ __html: item }} />
+                                  ))}
+                                </ol>
+                              ) : (
+                                <span className="italic text-slate-400">Tidak dijawab</span>
+                              )}
+                            </div>
+                          ) :
+                          Array.isArray(studentAns) ? (
                             <ul className="list-disc pl-4">
                               {studentAns.length > 0 ? studentAns.map((a, idx) => <li key={idx} dangerouslySetInnerHTML={{ __html: a }} />) : "Tidak dijawab"}
                             </ul>
@@ -452,13 +470,19 @@ export default function HasilUjianPage() {
                                 {q.pairs.map((p, idx) => (
                                   <li key={idx} className="text-sm flex items-center gap-2 flex-wrap">
                                     {p.leftImage && <img src={p.leftImage} className="h-8 inline-block rounded border" />}
-                                    <span>{p.left}</span>
+                                    <span>{p.left || `Kiri ${idx+1}`}</span>
                                     <span className="font-bold">→</span>
                                     {p.rightImage && <img src={p.rightImage} className="h-8 inline-block rounded border" />}
                                     <span>{p.right}</span>
                                   </li>
                                 ))}
                               </ul>
+                            ) : q.type === "ordering" && q.items ? (
+                              <ol className="list-decimal pl-4 space-y-1">
+                                {q.items.map((item, idx) => (
+                                  <li key={idx} dangerouslySetInnerHTML={{ __html: item }} />
+                                ))}
+                              </ol>
                             ) : q.type === "complex_mc" ? (
                               q.correctAnswers?.map((a, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: a }} />)
                             ) : q.type === "true_false" ? (
@@ -467,8 +491,6 @@ export default function HasilUjianPage() {
                               q.acceptedAnswers?.map((a, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: a }} />)
                             ) : q.type === "multi_true_false" ? (
                               "Lihat Pernyataan"
-                            ) : q.type === "ordering" ? (
-                              q.items?.map((item, idx) => <div key={idx} dangerouslySetInnerHTML={{ __html: item }} />)
                             ) : (
                               <div dangerouslySetInnerHTML={{ __html: q.correctAnswer || "-" }} />
                             )}
