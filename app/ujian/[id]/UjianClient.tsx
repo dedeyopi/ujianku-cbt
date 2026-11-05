@@ -43,11 +43,7 @@ function getRandomizedExam(exam: Exam, studentId: string): Exam {
       newQ.optionImages = shuffled.map(z => z.img);
       newQ._optIdx = shuffled.map(z => z.originalIdx);
     }
-    
-    if (newQ.type === "matching" && newQ.pairs) {
-      newQ.pairs = shuffleArrayWithSeed(newQ.pairs, studentId + q.id);
-    }
-    
+       
     return newQ;
   });
   return { ...exam, questions: shuffledQuestions };
