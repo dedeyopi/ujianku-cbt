@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { 
   AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, 
-  Lock, Loader2, Clock, ArrowRight, LayoutGrid, X, RefreshCw 
+  Lock, Loader2, Clock, ArrowRight, LayoutGrid, X, RefreshCw,
+  Sun, Moon
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { getSession, saveSession, clearSession } from "../../lib/session";
@@ -29,17 +30,11 @@ function getRandomizedExam(exam: Exam, studentId: string): Exam {
     const newQ = { ...q };
     if ((newQ.type === "multiple_choice" || newQ.type === "complex_mc") && newQ.options) {
       const qSeed = studentId + q.id;
-      if (newQ.optionImages) {
-        const zipped = newQ.options.map((opt, i) => ({ opt, img: newQ.optionImages![i] }));
-        const shuffled = shuffleArrayWithSeed(zipped, qSeed);
-        newQ.options = shuffled.map(z => z.opt);
-        newQ.optionImages = shuffled.map(z => z.img);
-      } else {
-        newQ.options = shuffleArrayWithSeed(newQ.options, qSeed);
-      }
-    }
-    if (newQ.type === "matching" && newQ.pairs) {
-      newQ.pairs = shuffleArrayWithSeed(newQ.pairs, studentId + q.id);
+      const zipped = newQ.options.map((opt, i) => ({ opt, img: newQ.optionImages?.[i], originalIdx: i }));
+      const shuffled = shuffleArrayWithSeed(zipped, qSeed);
+      newQ.options = shuffled.map(z => z.opt);
+      newQ.optionImages = shuffled.map(z => z.img);
+      newQ._optIdx = shuffled.map(z => z.originalIdx);
     }
     return newQ;
   });
@@ -53,7 +48,7 @@ export function UjianClient() {
 
   const [exam, setExam] = useState<Exam | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false); // State untuk tombol refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [nama, setNama] = useState("");
   const [nomorSoal, setNomorSoal] = useState(0);
   const [jawaban, setJawaban] = useState<Record<string, any>>({});
@@ -70,11 +65,22 @@ export function UjianClient() {
   const [showNavModal, setShowNavModal] = useState(false); 
   const [isCheckingStatus, setIsCheckingStatus] = useState(false); 
   
+  // STATE UNTUK TEMA
+  const [isLightMode, setIsLightMode] = useState(false);
+
   const [studentData, setStudentData] = useState<{ id: string; className: string } | null>(null);
 
   const violationsRef = useRef(0);
   const skipAutoSaveRef = useRef(true);
   const tabIdRef = useRef<string>("");
+
+  // VARIABEL WARNA UNTUK MEMUDAHKAN PEMBACAAN KODE
+  const bgMain = isLightMode ? "bg-slate-100" : "bg-[#0B1120]";
+  const bgCard = isLightMode ? "bg-white border-slate-200 shadow-md" : "bg-slate-800 border-slate-700 shadow-xl";
+  const bgInput = isLightMode ? "bg-slate-50 border-slate-300" : "bg-slate-900/50 border-slate-600";
+  const textPrimary = isLightMode ? "text-slate-900" : "text-white";
+  const textSecondary = isLightMode ? "text-slate-600" : "text-slate-300";
+  const textMuted = isLightMode ? "text-slate-500" : "text-slate-400";
 
   useEffect(() => {
     let tid = sessionStorage.getItem("ujianku_tab_id");
@@ -170,13 +176,11 @@ export function UjianClient() {
     loadInitialData();
   }, [loadInitialData]);
 
-  // --- FUNGSI REFRESH SOAL (TANPA KELUAR HALAMAN) ---
   async function handleRefreshSoal() {
     setIsRefreshing(true);
     try {
       const found = await fetchExamForStudent(examId);
       if (found) {
-        // Acak ulang
         const randomizedExam = getRandomizedExam(found, studentData?.id || "");
         setExam(randomizedExam);
         alert("Soal berhasil diperbarui!");
@@ -187,7 +191,6 @@ export function UjianClient() {
     setIsRefreshing(false);
   }
 
-  // Ping server
   useEffect(() => {
     if (!exam || !studentData || showStartPrompt || selesai || isExamLocked) return;
     const sync = async () => {
@@ -360,7 +363,7 @@ export function UjianClient() {
   }
 
   if (loading || !exam) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#0B1120]"><Loader2 className="w-8 h-8 animate-spin text-amber-400" /></div>;
+    return <div className={`min-h-screen flex items-center justify-center ${bgMain}`}><Loader2 className="w-8 h-8 animate-spin text-amber-400" /></div>;
   }
 
   if (isExamLocked) {
@@ -386,30 +389,30 @@ export function UjianClient() {
 
   if (isSubmitting) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B1120] text-white p-6">
+      <div className={`min-h-screen flex flex-col items-center justify-center ${bgMain} ${textPrimary} p-6`}>
         <Loader2 className="w-14 h-14 animate-spin text-amber-400 mb-6" />
         <h2 className="text-2xl font-bold mb-2">Mengirim Jawaban...</h2>
-        <p className="text-slate-400 text-center max-w-md">Sistem sedang menilai jawaban Anda. Jangan tutup atau refresh halaman ini.</p>
+        <p className={`${textSecondary} text-center max-w-md`}>Sistem sedang menilai jawaban Anda. Jangan tutup atau refresh halaman ini.</p>
       </div>
     );
   }
 
   if (showStartPrompt) {
     return (
-      <main className="min-h-screen flex items-center justify-center p-6 bg-[#0B1120] relative overflow-hidden">
+      <main className={`min-h-screen flex items-center justify-center p-6 ${bgMain} relative overflow-hidden`}>
         <div className="absolute top-0 left-1/2 w-[600px] h-[600px] bg-blue-600/20 rounded-full blur-[100px] -translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
         
-        <div className="p-8 max-w-lg w-full text-center bg-slate-800 border border-slate-700 shadow-2xl relative z-10 rounded-3xl">
-          <div className="w-20 h-20 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center mx-auto mb-6 shadow-inner">
+        <div className={`p-8 max-w-lg w-full text-center border ${bgCard} relative z-10 rounded-3xl`}>
+          <div className={`w-20 h-20 rounded-full ${isLightMode ? 'bg-slate-100 border-slate-200' : 'bg-slate-900 border-slate-700'} flex items-center justify-center mx-auto mb-6 shadow-inner`}>
             <Lock className="w-10 h-10 text-amber-400" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">{exam.title}</h1>
-          <p className="text-lg font-medium text-slate-300 mb-8">{exam.questions.length} soal • {Math.floor(exam.duration / 60)} menit</p>
+          <h1 className={`text-3xl font-bold mb-2 ${textPrimary}`}>{exam.title}</h1>
+          <p className={`text-lg font-medium ${textSecondary} mb-8`}>{exam.questions.length} soal • {Math.floor(exam.duration / 60)} menit</p>
           
-          <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl text-left mb-8">
+          <div className={`p-6 rounded-2xl text-left mb-8 border ${isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-900 border-slate-700'}`}>
             <p className="font-bold text-amber-400 text-lg mb-3 flex items-center gap-2"><AlertTriangle className="w-5 h-5" /> Perhatian Ketat:</p>
-            <ul className="list-disc pl-5 space-y-2 text-base text-slate-300">
-              <li>Ujian berjalan dalam mode <b className="text-white">Layar Penuh</b>.</li>
+            <ul className={`list-disc pl-5 space-y-2 text-base ${textSecondary}`}>
+              <li>Ujian berjalan dalam mode <b className={textPrimary}>Layar Penuh</b>.</li>
               <li><b>Dilarang keluar dari layar penuh atau pindah tab.</b></li>
               <li>Sistem akan memberi peringatan 2x. Jika melanggar <b>3x, ujian otomatis terkunci</b>.</li>
               <li>Klik kanan, blok teks, dan Copy-Paste dinonaktifkan.</li>
@@ -428,17 +431,17 @@ export function UjianClient() {
   const ans = jawaban[soal.id];
 
   return (
-    <div className="h-screen w-full bg-[#0B1120] p-4 sm:p-6 font-sans flex flex-col overflow-hidden" style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }}>
+    <div className={`h-screen w-full p-4 sm:p-6 font-sans flex flex-col overflow-hidden ${bgMain}`} style={{ userSelect: "none", WebkitUserSelect: "none", msUserSelect: "none" }}>
       
       {showNavModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-slate-800 border border-slate-700 shadow-2xl rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col animate-fade-in-up">
-            <div className="p-5 border-b border-slate-700 flex justify-between items-center bg-slate-900 rounded-t-3xl">
+          <div className={`border w-full max-w-md max-h-[80vh] flex flex-col animate-fade-in-up rounded-3xl ${bgCard}`}>
+            <div className={`p-5 border-b flex justify-between items-center rounded-t-3xl ${isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-900 border-slate-700'}`}>
               <div>
-                <h3 className="text-lg font-bold text-white">Navigasi Soal</h3>
-                <p className="text-xs text-slate-400">{exam.questions.length} Butir Soal</p>
+                <h3 className={`text-lg font-bold ${textPrimary}`}>Navigasi Soal</h3>
+                <p className={`text-xs ${textMuted}`}>{exam.questions.length} Butir Soal</p>
               </div>
-              <button onClick={() => setShowNavModal(false)} className="p-2 bg-slate-800 text-slate-400 hover:text-white rounded-full transition">
+              <button onClick={() => setShowNavModal(false)} className={`p-2 rounded-full transition ${isLightMode ? 'bg-slate-200 text-slate-600 hover:text-slate-900' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -447,15 +450,15 @@ export function UjianClient() {
                 {exam.questions.map((q, i) => {
                   const answered = jawaban[q.id] !== undefined && (Array.isArray(jawaban[q.id]) ? jawaban[q.id].length > 0 : jawaban[q.id] !== "");
                   return (
-                    <button key={q.id} onClick={() => { setNomorSoal(i); setShowNavModal(false); }} className={`h-11 rounded-xl font-bold text-base transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>
+                    <button key={q.id} onClick={() => { setNomorSoal(i); setShowNavModal(false); }} className={`h-11 rounded-xl font-bold text-base transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/30" : isLightMode ? "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>
                   );
                 })}
               </div>
             </div>
-            <div className="p-4 border-t border-slate-700 flex justify-between items-center bg-slate-900 rounded-b-3xl text-xs font-medium text-slate-400">
+            <div className={`p-4 border-t flex justify-between items-center rounded-b-3xl text-xs font-medium ${isLightMode ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>
               <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-amber-400"></div> Aktif</div>
               <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-500/50"></div> Dijawab</div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-slate-900 border border-slate-700"></div> Kosong</div>
+              <div className={`flex items-center gap-2`}><div className={`w-3 h-3 rounded border ${isLightMode ? 'bg-slate-100 border-slate-300' : 'bg-slate-900 border-slate-700'}`}></div> Kosong</div>
             </div>
           </div>
         </div>
@@ -463,16 +466,16 @@ export function UjianClient() {
 
       {showWarning && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="p-8 max-w-md w-full bg-slate-800 border-2 border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-fade-in-up rounded-3xl">
+          <div className={`p-8 max-w-md w-full border-2 border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-fade-in-up rounded-3xl ${bgCard}`}>
             <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4 border border-red-500/30">
               <AlertTriangle className="w-8 h-8 text-red-500 animate-pulse" />
             </div>
-            <h3 className="text-2xl font-bold text-white text-center mb-2">Pelanggaran Terdeteksi!</h3>
-            <p className="text-sm text-slate-300 text-center mb-6 leading-relaxed">Anda terdeteksi keluar dari layar ujian atau berpindah tab. Tindakan ini tercatat oleh sistem.</p>
-            <div className="bg-red-500/10 rounded-xl p-5 text-center mb-6 border border-red-500/20">
-              <p className="text-xs font-semibold text-red-400 uppercase tracking-widest mb-1">Peringatan Ke-</p>
-              <p className="text-5xl font-black text-red-500">{violations}<span className="text-2xl text-red-400 font-normal"> / 3</span></p>
-              {violations === 2 && <p className="text-xs font-bold text-red-400 mt-3 animate-pulse">⚠️ HATI-HATI! Satu pelanggaran lagi akan mengunci ujian Anda secara permanen.</p>}
+            <h3 className={`text-2xl font-bold text-center mb-2 ${textPrimary}`}>Pelanggaran Terdeteksi!</h3>
+            <p className={`text-sm ${textSecondary} text-center mb-6 leading-relaxed`}>Anda terdeteksi keluar dari layar ujian atau berpindah tab. Tindakan ini tercatat oleh sistem.</p>
+            <div className={`rounded-xl p-5 text-center mb-6 border ${isLightMode ? 'bg-red-50 border-red-200' : 'bg-red-500/10 border-red-500/20'}`}>
+              <p className={`text-xs font-semibold uppercase tracking-widest mb-1 ${isLightMode ? 'text-red-600' : 'text-red-400'}`}>Peringatan Ke-</p>
+              <p className="text-5xl font-black text-red-500">{violations}<span className={`text-2xl font-normal ${isLightMode ? 'text-red-500' : 'text-red-400'}`}> / 3</span></p>
+              {violations === 2 && <p className={`text-xs font-bold mt-3 animate-pulse ${isLightMode ? 'text-red-600' : 'text-red-400'}`}>⚠️ HATI-HATI! Satu pelanggaran lagi akan mengunci ujian Anda secara permanen.</p>}
             </div>
             <button onClick={() => { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); setShowWarning(false); }} className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition shadow-lg shadow-red-600/30">Saya Mengerti, Kembali ke Ujian</button>
           </div>
@@ -482,34 +485,34 @@ export function UjianClient() {
       <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
         
         <aside className="hidden lg:flex flex-col w-80 shrink-0 h-full gap-4">
-          <div className="bg-slate-800 border border-slate-700 shadow-lg rounded-2xl p-5 shrink-0">
+          <div className={`p-5 shrink-0 rounded-2xl border ${bgCard}`}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0">
+              <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${isLightMode ? 'bg-slate-100 border-slate-200' : 'bg-slate-900 border-slate-700'}`}>
                 <span className="font-black text-amber-400 text-base">{nama.charAt(0)}</span>
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Peserta</p>
-                <p className="font-bold text-white text-sm truncate">{nama}</p>
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${textMuted}`}>Peserta</p>
+                <p className={`font-bold text-sm truncate ${textPrimary}`}>{nama}</p>
               </div>
             </div>
-            <div className="bg-slate-900 px-4 py-3 rounded-xl border border-slate-700 text-center">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-center gap-1"><Clock className="w-3.5 h-3.5"/> Sisa Waktu</p>
-              <p className={`font-black text-3xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-400"}`}>{Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}</p>
+            <div className={`px-4 py-3 rounded-xl border text-center ${isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-900 border-slate-700'}`}>
+              <p className={`text-xs font-semibold uppercase tracking-wider mb-1 flex items-center justify-center gap-1 ${textSecondary}`}><Clock className="w-3.5 h-3.5"/> Sisa Waktu</p>
+              <p className={`font-black text-3xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-500"}`}>{Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}</p>
             </div>
           </div>
 
-          <div className="bg-slate-800 border border-slate-700 shadow-lg rounded-2xl p-5 flex-1 flex flex-col">
+          <div className={`p-5 flex-1 flex flex-col rounded-2xl border ${bgCard}`}>
             <div className="flex justify-between items-center mb-4 shrink-0">
-              <p className="text-sm font-semibold text-slate-300">Navigasi Soal</p>
-              <p className="text-xs text-slate-500">{exam.questions.length} Butir</p>
+              <p className={`text-sm font-semibold ${textSecondary}`}>Navigasi Soal</p>
+              <p className={`text-xs ${textMuted}`}>{exam.questions.length} Butir</p>
             </div>
             <div className="grid grid-cols-5 gap-2 overflow-y-auto pr-1 flex-1 content-start">
               {exam.questions.map((q, i) => {
                 const answered = jawaban[q.id] !== undefined && (Array.isArray(jawaban[q.id]) ? jawaban[q.id].length > 0 : jawaban[q.id] !== "");
-                return <button key={q.id} onClick={() => setNomorSoal(i)} className={`h-10 rounded-lg font-bold text-sm transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>;
+                return <button key={q.id} onClick={() => setNomorSoal(i)} className={`h-10 rounded-lg font-bold text-sm transition-all flex items-center justify-center ${i === nomorSoal ? "bg-amber-400 text-slate-900 shadow-[0_0_10px_rgba(251,191,36,0.4)] scale-110" : answered ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/30" : isLightMode ? "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200" : "bg-slate-900 text-slate-500 border border-slate-700 hover:bg-slate-700"}`}>{i+1}</button>;
               })}
             </div>
-            <div className="mt-6 pt-4 border-t border-slate-700/50 shrink-0">
+            <div className={`mt-6 pt-4 border-t shrink-0 ${isLightMode ? 'border-slate-200' : 'border-slate-700/50'}`}>
                <button onClick={() => submitExam(false)} className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(52,211,153,0.2)] flex items-center justify-center gap-2"><CheckCircle2 className="w-4 h-4"/> Selesai & Kirim</button>
             </div>
           </div>
@@ -517,70 +520,77 @@ export function UjianClient() {
 
         <main className="flex-1 flex flex-col h-full overflow-hidden">
           
-          {/* HEADER MOBILE + TOMBOL REFRESH */}
-          <div className="lg:hidden p-4 mb-4 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl shrink-0">
+          <div className={`lg:hidden p-4 mb-4 flex justify-between items-center rounded-2xl border shrink-0 ${bgCard}`}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-xl border flex items-center justify-center ${isLightMode ? 'bg-slate-100 border-slate-200' : 'bg-slate-900 border-slate-700'}`}>
                 <span className="font-black text-amber-400 text-base">{nama.charAt(0)}</span>
               </div>
               <div>
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Peserta</p>
-                <p className="font-bold text-white text-sm truncate max-w-[100px]">{nama}</p>
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${textMuted}`}>Peserta</p>
+                <p className={`font-bold text-sm truncate max-w-[100px] ${textPrimary}`}>{nama}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <button onClick={handleRefreshSoal} disabled={isRefreshing} className="p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-blue-400 hover:bg-slate-700 transition shadow-sm" title="Refresh Soal">
+            <div className="flex items-center gap-2">
+              <button onClick={() => setIsLightMode(!isLightMode)} className={`p-2 rounded-xl border transition ${isLightMode ? 'bg-slate-100 border-slate-200 text-amber-600' : 'bg-slate-900 border-slate-700 text-amber-400'}`} title="Ganti Tema">
+                {isLightMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              </button>
+              <button onClick={handleRefreshSoal} disabled={isRefreshing} className={`p-2 rounded-xl border transition ${isLightMode ? 'bg-slate-100 border-slate-200 text-blue-600' : 'bg-slate-900 border-slate-700 text-blue-400'}`} title="Refresh Soal">
                 <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
               </button>
-              <button onClick={() => setShowNavModal(true)} className="p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-amber-400 hover:bg-slate-700 transition shadow-sm">
+              <button onClick={() => setShowNavModal(true)} className={`p-2 rounded-xl border transition ${isLightMode ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-slate-900 border-slate-700 text-amber-400'}`}>
                 <LayoutGrid className="w-5 h-5" />
               </button>
-              <div className="text-right bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700">
-                <p className={`font-black text-xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-400"}`}>{Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}</p>
+              <div className={`text-right px-3 py-1.5 rounded-lg border ${isLightMode ? 'bg-slate-100 border-slate-200' : 'bg-slate-900 border-slate-700'}`}>
+                <p className={`font-black text-xl tabular-nums tracking-tight ${sisaWaktu < 60 ? "text-red-500 animate-pulse" : "text-amber-500"}`}>{Math.floor(sisaWaktu/60)}:{(sisaWaktu%60).toString().padStart(2,'0')}</p>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 bg-slate-800 border border-slate-700 shadow-xl rounded-3xl p-6 sm:p-10 flex flex-col overflow-y-auto mb-4">
-            <div className="flex justify-between items-center mb-8 border-b border-slate-700 pb-4 shrink-0">
-              <p className="text-sm sm:text-base font-bold text-slate-300 uppercase tracking-wider">Soal {nomorSoal + 1} <span className="text-slate-500 font-normal">dari {exam.questions.length}</span></p>
+          <div className={`flex-1 p-6 sm:p-10 flex flex-col overflow-y-auto mb-4 border rounded-3xl ${bgCard}`}>
+            <div className={`flex justify-between items-center mb-8 pb-4 border-b shrink-0 ${isLightMode ? 'border-slate-200' : 'border-slate-700'}`}>
+              <p className={`text-sm sm:text-base font-bold uppercase tracking-wider ${textSecondary}`}>Soal {nomorSoal + 1} <span className={`font-normal ${textMuted}`}>dari {exam.questions.length}</span></p>
               <div className="flex items-center gap-2">
-                {savedFlash && <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fade-in-up"><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
-                <button onClick={handleRefreshSoal} disabled={isRefreshing} className="hidden lg:flex p-1.5 text-xs text-slate-400 hover:text-white bg-slate-900 border border-slate-700 rounded-lg transition items-center gap-1">
+                {savedFlash && <span className={`text-xs font-semibold flex items-center gap-1 animate-fade-in-up ${isLightMode ? 'text-emerald-600' : 'text-emerald-400'}`}><CheckCircle2 className="w-4 h-4"/> Tersimpan</span>}
+                <button onClick={() => setIsLightMode(!isLightMode)} className={`hidden lg:flex p-1.5 text-xs border rounded-lg transition items-center gap-1 ${isLightMode ? 'bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200' : 'bg-slate-900 border-slate-700 text-amber-400 hover:text-white'}`}>
+                  {isLightMode ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />} Tema
+                </button>
+                <button onClick={handleRefreshSoal} disabled={isRefreshing} className={`hidden lg:flex p-1.5 text-xs border rounded-lg transition items-center gap-1 ${isLightMode ? 'bg-slate-100 border-slate-200 text-blue-600 hover:bg-slate-200' : 'bg-slate-900 border-slate-700 text-blue-400 hover:text-white'}`}>
                   <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} /> Refresh Soal
                 </button>
               </div>
             </div>
             
-            <div className="rich-text-content soal-pertanyaan font-medium text-white mb-10 shrink-0 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" dangerouslySetInnerHTML={{ __html: soal.question }} />
-            {soal.image && <img src={soal.image} className="max-h-64 mb-10 rounded-xl border border-slate-600 shadow-md shrink-0 object-contain self-start" />}
+            <div className={`rich-text-content soal-pertanyaan font-medium mb-10 shrink-0 prose prose-sm sm:prose-base max-w-none ${textPrimary}`} dangerouslySetInnerHTML={{ __html: soal.question }} />
+            {soal.image && <img src={soal.image} className={`max-h-64 mb-10 rounded-xl border shadow-sm shrink-0 object-contain self-start ${isLightMode ? 'border-slate-300' : 'border-slate-600'}`} />}
 
             <div className="space-y-4 shrink-0">
               {soal.type === "multiple_choice" && soal.options?.map((opt, i) => {
-                const identifier = opt || `Opsi ${i+1}`;
+                const originalIdx = soal._optIdx?.[i] ?? i;
+                const identifier = opt || `Opsi ${originalIdx + 1}`;
                 const img = soal.optionImages?.[i];
                 const isSelected = ans === identifier;
                 return (
-                  <button key={i} onClick={() => updateJawaban(soal.id, identifier)} className={`w-full text-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-200 ${isSelected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-900/50 hover:border-slate-500"}`}>
-                    <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 transition-colors ${isSelected ? "bg-amber-400 text-slate-900" : "bg-slate-700 text-slate-300"}`}>{String.fromCharCode(65+i)}</span>
-                    {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
-                    <div className={`rich-text-content text-lg sm:text-xl prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
+                  <button key={i} onClick={() => updateJawaban(soal.id, identifier)} className={`w-full text-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-200 ${isSelected ? (isLightMode ? "border-amber-500 bg-amber-50" : "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]") : (isLightMode ? "border-slate-200 bg-white hover:border-slate-300" : "border-slate-600 bg-slate-900/50 hover:border-slate-500")}`}>
+                    <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 transition-colors ${isSelected ? "bg-amber-400 text-slate-900" : isLightMode ? "bg-slate-100 text-slate-500" : "bg-slate-700 text-slate-300"}`}>{String.fromCharCode(65+i)}</span>
+                    {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-300 bg-white p-1" alt={`Opsi ${i+1}`} />}
+                    <div className={`rich-text-content text-lg sm:text-xl prose prose-sm max-w-none ${isSelected ? (isLightMode ? 'text-amber-900 font-medium' : 'text-amber-100 font-medium') : (isLightMode ? 'text-slate-700' : 'text-slate-200')}`} dangerouslySetInnerHTML={{ __html: opt }} />
                   </button>
                 );
               })}
 
               {soal.type === "complex_mc" && soal.options?.map((opt, i) => {
-                const identifier = opt || `Opsi ${i+1}`;
+                const originalIdx = soal._optIdx?.[i] ?? i;
+                const identifier = opt || `Opsi ${originalIdx + 1}`;
                 const img = soal.optionImages?.[i];
                 const selected = Array.isArray(ans) && ans.includes(identifier);
                 return (
                   <button key={i} onClick={() => {
                     const curr = Array.isArray(ans) ? ans : [];
                     updateJawaban(soal.id, selected ? curr.filter(a => a !== identifier) : [...curr, identifier]);
-                  }} className={`w-full text-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-200 ${selected ? "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-900/50 hover:border-slate-500"}`}>
-                    <div className={`w-8 h-8 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-500"}`}>{selected && <CheckCircle2 className="w-5 h-5"/>}</div>
-                    {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-600 bg-white p-1" alt={`Opsi ${i+1}`} />}
-                    <div className={`rich-text-content text-lg sm:text-xl prose prose-sm max-w-none prose-invert [&_*]:!text-inherit ${selected ? 'text-amber-100 font-medium' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: opt }} />
+                  }} className={`w-full text-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-200 ${selected ? (isLightMode ? "border-amber-500 bg-amber-50" : "border-amber-400 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.1)]") : (isLightMode ? "border-slate-200 bg-white hover:border-slate-300" : "border-slate-600 bg-slate-900/50 hover:border-slate-500")}`}>
+                    <div className={`w-8 h-8 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "bg-amber-400 border-amber-400 text-slate-900" : isLightMode ? "border-slate-300" : "border-slate-500"}`}>{selected && <CheckCircle2 className="w-5 h-5"/>}</div>
+                    {img && <img src={img} className="h-20 object-contain rounded-lg border border-slate-300 bg-white p-1" alt={`Opsi ${i+1}`} />}
+                    <div className={`rich-text-content text-lg sm:text-xl prose prose-sm max-w-none ${selected ? (isLightMode ? 'text-amber-900 font-medium' : 'text-amber-100 font-medium') : (isLightMode ? 'text-slate-700' : 'text-slate-200')}`} dangerouslySetInnerHTML={{ __html: opt }} />
                   </button>
                 );
               })}
@@ -590,7 +600,7 @@ export function UjianClient() {
                   {[true, false].map(val => {
                     const isSelected = ans === val;
                     return (
-                      <button key={String(val)} onClick={() => updateJawaban(soal.id, val)} className={`py-6 rounded-2xl border-2 font-bold text-lg transition-all duration-200 ${isSelected ? "border-amber-400 bg-amber-400/10 text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "border-slate-600 bg-slate-900/50 text-slate-300 hover:border-slate-500"}`}>{val ? "BENAR" : "SALAH"}</button>
+                      <button key={String(val)} onClick={() => updateJawaban(soal.id, val)} className={`py-6 rounded-2xl border-2 font-bold text-lg transition-all duration-200 ${isSelected ? (isLightMode ? "border-amber-500 bg-amber-50 text-amber-700" : "border-amber-400 bg-amber-400/10 text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.1)]") : (isLightMode ? "border-slate-200 bg-white text-slate-600 hover:border-slate-300" : "border-slate-600 bg-slate-900/50 text-slate-300 hover:border-slate-500")}`}>{val ? "BENAR" : "SALAH"}</button>
                     );
                   })}
                 </div>
@@ -599,38 +609,35 @@ export function UjianClient() {
               {soal.type === "multi_true_false" && soal.statements?.map((st, i) => {
                 const curr = ans || {};
                 return (
-                  <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 border-2 border-slate-600 bg-slate-900/50 rounded-2xl gap-4">
-                    <div className="rich-text-content text-base sm:text-lg text-slate-200 flex-1 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" dangerouslySetInnerHTML={{ __html: st.text }} />
+                  <div key={i} className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 border-2 rounded-2xl gap-4 ${isLightMode ? 'border-slate-200 bg-white' : 'border-slate-600 bg-slate-900/50'}`}>
+                    <div className={`rich-text-content text-base sm:text-lg flex-1 prose prose-sm max-w-none ${isLightMode ? 'text-slate-700' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: st.text }} />
                     <div className="flex gap-2 shrink-0">
-                      <button onClick={() => updateJawaban(soal.id, {...curr, [i]: true})} className={`px-6 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${curr[i] === true ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>BENAR</button>
-                      <button onClick={() => updateJawaban(soal.id, {...curr, [i]: false})} className={`px-6 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${curr[i] === false ? "bg-amber-400 border-amber-400 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>SALAH</button>
+                      <button onClick={() => updateJawaban(soal.id, {...curr, [i]: true})} className={`px-6 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${curr[i] === true ? "bg-amber-400 border-amber-400 text-slate-900" : isLightMode ? "border-slate-300 text-slate-500 hover:border-slate-400" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>BENAR</button>
+                      <button onClick={() => updateJawaban(soal.id, {...curr, [i]: false})} className={`px-6 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${curr[i] === false ? "bg-amber-400 border-amber-400 text-slate-900" : isLightMode ? "border-slate-300 text-slate-500 hover:border-slate-400" : "border-slate-600 text-slate-400 hover:border-slate-500"}`}>SALAH</button>
                     </div>
                   </div>
                 );
               })}
 
-              {/* UI MENJODOHKAN DENGAN DROPDOWN & TANPA BUG KLIK */}
               {soal.type === "matching" && (
                 <div className="space-y-4">
                   {soal.pairs?.map((p, i) => {
                     const curr = ans || {};
                     const selectedValue = curr[i];
                     return (
-                      <div key={i} className="flex flex-col sm:flex-row gap-4 items-center p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl">
-                        {/* KIRI: Pertanyaan / Gambar Kiri */}
+                      <div key={i} className={`flex flex-col sm:flex-row gap-4 items-center p-4 border-2 rounded-xl ${isLightMode ? 'border-slate-200 bg-slate-50' : 'border-slate-600 bg-slate-900/50'}`}>
                         <div className="flex-1 w-full flex items-center gap-3">
-                          <span className="w-6 text-center font-bold text-amber-400">{i+1}.</span>
-                          {p.leftImage && <img src={p.leftImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1 border border-slate-500" />}
-                          {p.left && <div className="rich-text-content flex-1 text-base text-slate-200" dangerouslySetInnerHTML={{ __html: p.left }} />}
+                          <span className="w-6 text-center font-bold text-amber-500">{i+1}.</span>
+                          {p.leftImage && <img src={p.leftImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1 border border-slate-300" />}
+                          {p.left && <div className={`rich-text-content flex-1 text-base ${isLightMode ? 'text-slate-700' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: p.left }} />}
                         </div>
                         
-                        {/* KANAN: Dropdown Pilihan */}
                         <div className="flex-1 w-full flex items-center gap-2">
-                          <span className="text-slate-500">→</span>
+                          <span className={textMuted}>→</span>
                           <select 
                             value={selectedValue || ""} 
                             onChange={(e) => updateJawaban(soal.id, {...curr, [i]: e.target.value})} 
-                            className={`flex-1 p-3 rounded-lg border-2 bg-slate-800 text-base text-white focus:border-amber-400 focus:outline-none transition ${selectedValue ? 'border-amber-400/50' : 'border-slate-600'}`}
+                            className={`flex-1 p-3 rounded-lg border-2 text-base focus:border-amber-500 focus:outline-none transition ${isLightMode ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-600 text-white'} ${selectedValue ? 'border-amber-400/50' : ''}`}
                           >
                             <option value="" disabled>-- Pilih Pasangan --</option>
                             {soal.pairs?.map((pr, idx) => (
@@ -638,9 +645,8 @@ export function UjianClient() {
                             ))}
                           </select>
                           
-                          {/* Tampilkan gambar dari pilihan yang dipilih */}
                           {selectedValue && soal.pairs?.find(pr => pr.right === selectedValue)?.rightImage && (
-                            <img src={soal.pairs.find(pr => pr.right === selectedValue)!.rightImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1 border border-slate-500" />
+                            <img src={soal.pairs.find(pr => pr.right === selectedValue)!.rightImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1 border border-slate-300" />
                           )}
                         </div>
                       </div>
@@ -652,12 +658,12 @@ export function UjianClient() {
               {soal.type === "ordering" && (
                 <div className="space-y-3">
                   {(ans && Array.isArray(ans) ? ans : soal.items || []).map((item, i, arr) => (
-                    <div key={i} className="flex gap-4 items-center p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl">
-                      <span className="w-8 text-center font-bold text-amber-400 text-lg">{i+1}</span>
-                      <div className="rich-text-content flex-1 text-base text-slate-200 prose prose-invert max-w-none [&_*]:!text-white [&_*]:!bg-transparent" dangerouslySetInnerHTML={{ __html: item }} />
+                    <div key={i} className={`flex gap-4 items-center p-4 border-2 rounded-xl ${isLightMode ? 'border-slate-200 bg-white' : 'border-slate-600 bg-slate-900/50'}`}>
+                      <span className="w-8 text-center font-bold text-amber-500 text-lg">{i+1}</span>
+                      <div className={`rich-text-content flex-1 text-base prose prose-sm max-w-none ${isLightMode ? 'text-slate-700' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: item }} />
                       <div className="flex flex-col gap-1">
-                        <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className="p-2 bg-slate-700 rounded-lg text-slate-300 hover:bg-slate-600 disabled:opacity-30">▲</button>
-                        <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className="p-2 bg-slate-700 rounded-lg text-slate-300 hover:bg-slate-600 disabled:opacity-30">▼</button>
+                        <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className={`p-2 rounded-lg transition disabled:opacity-30 ${isLightMode ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>▲</button>
+                        <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className={`p-2 rounded-lg transition disabled:opacity-30 ${isLightMode ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>▼</button>
                       </div>
                     </div>
                   ))}
@@ -665,20 +671,20 @@ export function UjianClient() {
               )}
 
               {soal.type === "short_answer" && (
-                <input type="text" value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban Anda..." className="w-full p-5 border-2 border-slate-600 bg-slate-900/50 rounded-2xl text-xl text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none transition" />
+                <input type="text" value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban Anda..." className={`w-full p-5 border-2 rounded-2xl text-xl focus:border-amber-500 focus:outline-none transition ${isLightMode ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400' : 'bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500'}`} />
               )}
 
               {soal.type === "essay" && (
                 <div>
-                  <textarea rows={10} value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban panjang Anda di sini..." className="w-full p-5 border-2 border-slate-600 bg-slate-900/50 rounded-2xl text-lg text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none resize-none transition" />
-                  <p className="text-sm font-medium text-amber-500 mt-2">Jawaban esai akan dinilai manual oleh guru.</p>
+                  <textarea rows={10} value={ans || ""} onChange={(e) => updateJawaban(soal.id, e.target.value)} placeholder="Ketik jawaban panjang Anda di sini..." className={`w-full p-5 border-2 rounded-2xl text-lg focus:border-amber-500 focus:outline-none resize-none transition ${isLightMode ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400' : 'bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500'}`} />
+                  <p className={`text-sm font-medium mt-2 ${isLightMode ? 'text-amber-600' : 'text-amber-500'}`}>Jawaban esai akan dinilai manual oleh guru.</p>
                 </div>
               )}
             </div>
           </div>
 
           <div className="flex justify-between gap-4 shrink-0">
-            <button onClick={() => setNomorSoal(n => Math.max(0, n-1))} disabled={nomorSoal===0} className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-300 bg-slate-800 border-2 border-slate-700 hover:bg-slate-700 disabled:opacity-30 transition flex items-center justify-center gap-2"><ChevronLeft className="w-5 h-5"/> Sebelumnya</button>
+            <button onClick={() => setNomorSoal(n => Math.max(0, n-1))} disabled={nomorSoal===0} className={`flex-1 py-4 px-6 rounded-xl font-bold text-base border-2 transition disabled:opacity-30 flex items-center justify-center gap-2 ${isLightMode ? 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}><ChevronLeft className="w-5 h-5"/> Sebelumnya</button>
             
             {nomorSoal === exam.questions.length - 1 ? (
               <button onClick={() => submitExam(false)} className="flex-1 py-4 px-6 rounded-xl font-bold text-base text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.2)] transition flex items-center justify-center gap-2"><CheckCircle2 className="w-5 h-5"/> Selesai & Kirim</button>
