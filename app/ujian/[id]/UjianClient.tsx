@@ -28,27 +28,14 @@ function shuffleArrayWithSeed<T>(array: T[], seedString: string): T[] {
 function getRandomizedExam(exam: Exam, studentId: string): Exam {
   const shuffledQuestions = shuffleArrayWithSeed(exam.questions, studentId + exam.id).map(q => {
     const newQ = { ...q };
-    
     if ((newQ.type === "multiple_choice" || newQ.type === "complex_mc") && newQ.options) {
       const qSeed = studentId + q.id;
-
       const zipped = newQ.options.map((opt, i) => ({ opt, img: newQ.optionImages?.[i], originalIdx: i }));
-=======
-      
-      // PERBAIKAN: Simpan originalIdx agar identifier tidak berubah saat diacak
-      const zipped = newQ.options.map((opt, i) => ({ 
-        opt, 
-        img: newQ.optionImages?.[i], 
-        originalIdx: i 
-      }));
-      
-
       const shuffled = shuffleArrayWithSeed(zipped, qSeed);
       newQ.options = shuffled.map(z => z.opt);
       newQ.optionImages = shuffled.map(z => z.img);
       newQ._optIdx = shuffled.map(z => z.originalIdx);
     }
-       
     return newQ;
   });
   return { ...exam, questions: shuffledQuestions };
@@ -78,7 +65,6 @@ export function UjianClient() {
   const [showNavModal, setShowNavModal] = useState(false); 
   const [isCheckingStatus, setIsCheckingStatus] = useState(false); 
   
-  // STATE UNTUK TEMA
   const [isLightMode, setIsLightMode] = useState(false);
 
   const [studentData, setStudentData] = useState<{ id: string; className: string } | null>(null);
@@ -87,10 +73,8 @@ export function UjianClient() {
   const skipAutoSaveRef = useRef(true);
   const tabIdRef = useRef<string>("");
 
-  // VARIABEL WARNA UNTUK MEMUDAHKAN PEMBACAAN KODE
   const bgMain = isLightMode ? "bg-slate-100" : "bg-[#0B1120]";
   const bgCard = isLightMode ? "bg-white border-slate-200 shadow-md" : "bg-slate-800 border-slate-700 shadow-xl";
-  const bgInput = isLightMode ? "bg-slate-50 border-slate-300" : "bg-slate-900/50 border-slate-600";
   const textPrimary = isLightMode ? "text-slate-900" : "text-white";
   const textSecondary = isLightMode ? "text-slate-600" : "text-slate-300";
   const textMuted = isLightMode ? "text-slate-500" : "text-slate-400";
@@ -533,11 +517,7 @@ export function UjianClient() {
 
         <main className="flex-1 flex flex-col h-full overflow-hidden">
           
-<<<<<<< HEAD
           <div className={`lg:hidden p-4 mb-4 flex justify-between items-center rounded-2xl border shrink-0 ${bgCard}`}>
-=======
-          <div className="lg:hidden p-4 mb-4 flex justify-between items-center bg-slate-800 border border-slate-700 shadow-lg rounded-2xl shrink-0">
->>>>>>> ff1d30e156d35f8fb9f6e4354d8689820d53d9c0
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl border flex items-center justify-center ${isLightMode ? 'bg-slate-100 border-slate-200' : 'bg-slate-900 border-slate-700'}`}>
                 <span className="font-black text-amber-400 text-base">{nama.charAt(0)}</span>
@@ -582,10 +562,6 @@ export function UjianClient() {
 
             <div className="space-y-4 shrink-0">
               {soal.type === "multiple_choice" && soal.options?.map((opt, i) => {
-<<<<<<< HEAD
-=======
-                // PERBAIKAN: Gunakan originalIdx
->>>>>>> ff1d30e156d35f8fb9f6e4354d8689820d53d9c0
                 const originalIdx = soal._optIdx?.[i] ?? i;
                 const identifier = opt || `Opsi ${originalIdx + 1}`;
                 const img = soal.optionImages?.[i];
@@ -600,10 +576,6 @@ export function UjianClient() {
               })}
 
               {soal.type === "complex_mc" && soal.options?.map((opt, i) => {
-<<<<<<< HEAD
-=======
-                // PERBAIKAN: Gunakan originalIdx
->>>>>>> ff1d30e156d35f8fb9f6e4354d8689820d53d9c0
                 const originalIdx = soal._optIdx?.[i] ?? i;
                 const identifier = opt || `Opsi ${originalIdx + 1}`;
                 const img = soal.optionImages?.[i];
@@ -650,11 +622,7 @@ export function UjianClient() {
                     const curr = ans || {};
                     const selectedValue = curr[i];
                     return (
-<<<<<<< HEAD
                       <div key={i} className={`flex flex-col sm:flex-row gap-4 items-center p-4 border-2 rounded-xl ${isLightMode ? 'border-slate-200 bg-slate-50' : 'border-slate-600 bg-slate-900/50'}`}>
-=======
-                      <div key={i} className="flex flex-col sm:flex-row gap-4 items-center p-4 bg-slate-900/50 border-2 border-slate-600 rounded-xl">
->>>>>>> ff1d30e156d35f8fb9f6e4354d8689820d53d9c0
                         <div className="flex-1 w-full flex items-center gap-3">
                           <span className="w-6 text-center font-bold text-amber-500">{i+1}.</span>
                           {p.leftImage && <img src={p.leftImage} className="h-16 w-16 object-contain bg-white rounded-lg p-1 border border-slate-300" />}
