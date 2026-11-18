@@ -413,11 +413,10 @@ export default function HasilUjianPage() {
                       <div className={`p-3 rounded-lg border ${isEssay ? 'bg-blue-50 border-blue-100 col-span-full' : isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
                         <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Jawaban Siswa</p>
                         <div className="text-slate-800 prose prose-sm max-w-none">
-                          {/* FIX MENJODOHKAN (Membaca berdasarkan Index) */}
                           {q.type === "matching" && q.pairs ? (
                             <ul className="list-disc pl-4 space-y-1">
                               {q.pairs.map((p, idx) => {
-                                const siswaPilih = studentAns ? studentAns[idx] : null; // Baca dari Index
+                                const siswaPilih = studentAns ? studentAns[idx] : null;
                                 const pasanganKanan = q.pairs?.find(pr => pr.right === siswaPilih);
                                 return (
                                   <li key={idx} className="text-sm flex items-center gap-2 flex-wrap">
@@ -433,14 +432,20 @@ export default function HasilUjianPage() {
                               })}
                             </ul>
                           ) : 
-                          /* FIX MENGURUTKAN (Tampilkan sebagai list bernomor) */
                           q.type === "ordering" && q.items ? (
                             <div>
                               {Array.isArray(studentAns) && studentAns.length > 0 ? (
                                 <ol className="list-decimal pl-4 space-y-1">
-                                  {studentAns.map((item: string, idx: number) => (
-                                    <li key={idx} dangerouslySetInnerHTML={{ __html: item }} />
-                                  ))}
+                                  {studentAns.map((item: any, idx: number) => {
+                                    const text = typeof item === 'string' ? item : item.text;
+                                    const img = typeof item === 'string' ? undefined : item.img;
+                                    return (
+                                      <li key={idx} className="text-sm flex items-center gap-2 flex-wrap">
+                                        {img && <img src={img} className="h-8 inline-block rounded border" />}
+                                        <span dangerouslySetInnerHTML={{ __html: text }} />
+                                      </li>
+                                    );
+                                  })}
                                 </ol>
                               ) : (
                                 <span className="italic text-slate-400">Tidak dijawab</span>
@@ -477,7 +482,10 @@ export default function HasilUjianPage() {
                             ) : q.type === "ordering" && q.items ? (
                               <ol className="list-decimal pl-4 space-y-1">
                                 {q.items.map((item, idx) => (
-                                  <li key={idx} dangerouslySetInnerHTML={{ __html: item }} />
+                                  <li key={idx} className="text-sm flex items-center gap-2 flex-wrap">
+                                    {q.itemImages?.[idx] && <img src={q.itemImages[idx]} className="h-8 inline-block rounded border" />}
+                                    <span dangerouslySetInnerHTML={{ __html: item }} />
+                                  </li>
                                 ))}
                               </ol>
                             ) : q.type === "complex_mc" ? (

@@ -25,12 +25,16 @@ export function hitungPoinSoal(q: Question, jawabanSiswa: any): number {
       return benarSt / q.statements.length;
     case "matching":
       if (!q.pairs || q.pairs.length === 0) return 0;
-      // Penilaian berdasarkan Index (karena soal tidak diacak lagi)
       const benarPair = q.pairs.filter((p, i) => jawabanSiswa[i] === p.right).length;
       return benarPair / q.pairs.length;
     case "ordering":
       if (!q.items || !Array.isArray(jawabanSiswa) || q.items.length === 0) return 0;
-      const benarOrder = q.items.filter((item, i) => jawabanSiswa[i] === item).length;
+      const benarOrder = q.items.filter((item, i) => {
+        const siswaItem = jawabanSiswa[i];
+        // Mendukung format lama (string) dan format baru (objek { text, img })
+        const siswaText = typeof siswaItem === 'string' ? siswaItem : siswaItem?.text;
+        return normalize(siswaText) === normalize(item);
+      }).length;
       return benarOrder / q.items.length;
     case "short_answer":
       const accepted = q.acceptedAnswers || [];

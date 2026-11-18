@@ -3,7 +3,6 @@ import { Document, Packer, Paragraph, TextRun, AlignmentType, ImageRun } from "d
 import { saveAs } from "file-saver";
 import type { Exam } from "./types";
 
-// --- FUNGSI PEMBERSIH TEKS ---
 function cleanText(html: string | undefined): string {
   if (!html) return "";
   if (typeof window === "undefined") return html;
@@ -16,7 +15,6 @@ function cleanText(html: string | undefined): string {
   return text.trim();
 }
 
-// --- FUNGSI MENGUNDUH GAMBAR MENJADI BASE64 ---
 async function getBase64ImageFromUrl(imageUrl: string): Promise<string> {
   const res = await fetch(imageUrl);
   const blob = await res.blob();
@@ -28,13 +26,9 @@ async function getBase64ImageFromUrl(imageUrl: string): Promise<string> {
   });
 }
 
-// ==========================================
-// 1. EXPORT KE WORD (.docx)
-// ==========================================
 export async function exportToWord(exam: Exam) {
   const children: Paragraph[] = [];
 
-  // --- KOP IDENTITAS APLIKASI ---
   children.push(
     new Paragraph({
       children: [new TextRun({ text: "UjianKu - CBT", bold: true, size: 28, color: "2563eb" })],
@@ -48,7 +42,6 @@ export async function exportToWord(exam: Exam) {
     })
   );
 
-  // --- INFO UJIAN ---
   children.push(
     new Paragraph({
       text: exam.title,
@@ -66,11 +59,9 @@ export async function exportToWord(exam: Exam) {
     })
   );
 
-  // Loop Soal
   for (let index = 0; index < exam.questions.length; index++) {
     const q = exam.questions[index];
 
-    // Nomor & Pertanyaan
     children.push(
       new Paragraph({
         children: [
@@ -81,7 +72,6 @@ export async function exportToWord(exam: Exam) {
       })
     );
 
-    // Gambar Utama Soal
     if (q.image) {
       try {
         const base64Img = await getBase64ImageFromUrl(q.image);
@@ -98,7 +88,6 @@ export async function exportToWord(exam: Exam) {
       }
     }
 
-    // Opsi / Jawaban
     if (q.type === "multiple_choice" || q.type === "complex_mc") {
       for (let i = 0; i < (q.options?.length || 0); i++) {
         const opt = q.options![i];
@@ -148,7 +137,6 @@ export async function exportToWord(exam: Exam) {
           indent: { left: 400 },
         }));
 
-        // Gambar Kiri
         if (p.leftImage) {
           try {
             const base64Img = await getBase64ImageFromUrl(p.leftImage);
@@ -157,7 +145,6 @@ export async function exportToWord(exam: Exam) {
             children.push(new Paragraph({ children: [new ImageRun({ data: imgBuffer, transformation: { width: 100, height: 100 }, type: imgType })], indent: { left: 600 }, spacing: { after: 100 } }));
           } catch (e) {}
         }
-        // Gambar Kanan
         if (p.rightImage) {
           try {
             const base64Img = await getBase64ImageFromUrl(p.rightImage);
@@ -169,9 +156,21 @@ export async function exportToWord(exam: Exam) {
       }
     } else if (q.type === "ordering") {
       children.push(new Paragraph({ text: "Urutkan item berikut:", indent: { left: 400 } }));
-      q.items?.forEach((item) => {
+      for (let i = 0; i < (q.items?.length || 0); i++) {
+        const item = q.items![i];
+        const img = q.itemImages?.[i];
+        
         children.push(new Paragraph({ text: `(   ) ${cleanText(item)}`, indent: { left: 400 } }));
-      });
+        
+        if (img) {
+          try {
+            const base64Img = await getBase64ImageFromUrl(img);
+            const imgBuffer = await fetch(base64Img).then(res => res.arrayBuffer());
+            const imgType = base64Img.includes("data:image/png") ? "png" : "jpg";
+            children.push(new Paragraph({ children: [new ImageRun({ data: imgBuffer, transformation: { width: 100, height: 100 }, type: imgType })], indent: { left: 600 }, spacing: { after: 100 } }));
+          } catch (e) {}
+        }
+      }
     } else if (q.type === "short_answer") {
       children.push(new Paragraph({ text: "Jawaban: ............................................................", indent: { left: 400 } }));
     } else if (q.type === "essay") {
@@ -187,31 +186,25 @@ export async function exportToWord(exam: Exam) {
   saveAs(blob, `Soal_${exam.title.replace(/[^a-z0-9]/gi, '_')}.docx`);
 }
 
-// ==========================================
-// 2. EXPORT KE PDF
-// ==========================================
 export async function exportToPDF(exam: Exam) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 15;
   const maxLineWidth = pageWidth - margin * 2;
 
-  // --- KOP IDENTITAS APLIKASI ---
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(37, 99, 235); // Warna Biru
+  doc.setTextColor(37, 99, 235);
   doc.text("UjianKu - CBT", pageWidth / 2, 15, { align: "center" });
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "italic");
-  doc.setTextColor(100, 116, 139); // Abu-abu
+  doc.setTextColor(100, 116, 139);
   doc.text("Platform Ujian Digital Mandiri", pageWidth / 2, 21, { align: "center" });
 
-  // Garis Pembatas Kop
   doc.setDrawColor(200, 200, 200);
   doc.line(margin, 25, pageWidth - margin, 25);
 
-  // --- INFO UJIAN ---
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0, 0, 0);
@@ -223,20 +216,17 @@ export async function exportToPDF(exam: Exam) {
   
   let yPos = 52;
 
-  // Loop Soal
   for (let index = 0; index < exam.questions.length; index++) {
     const q = exam.questions[index];
 
     if (yPos > 260) { doc.addPage(); yPos = 20; }
 
-    // Teks Soal
     doc.setFont("helvetica", "bold");
     const questionText = `${index + 1}. ${cleanText(q.question)}`;
     const splitQuestion = doc.splitTextToSize(questionText, maxLineWidth);
     doc.text(splitQuestion, margin, yPos);
     yPos += splitQuestion.length * 6 + 2;
 
-    // Gambar Utama Soal
     if (q.image) {
       try {
         const base64Img = await getBase64ImageFromUrl(q.image);
@@ -254,7 +244,6 @@ export async function exportToPDF(exam: Exam) {
 
     doc.setFont("helvetica", "normal");
     
-    // Render Opsi Jawaban
     if (q.type === "multiple_choice" || q.type === "complex_mc") {
       for (let i = 0; i < (q.options?.length || 0); i++) {
         if (yPos > 270) { doc.addPage(); yPos = 20; }
@@ -323,11 +312,24 @@ export async function exportToPDF(exam: Exam) {
         }
       }
     } else if (q.type === "ordering") {
-      q.items?.forEach((item) => {
+      for (let i = 0; i < (q.items?.length || 0); i++) {
         if (yPos > 275) { doc.addPage(); yPos = 20; }
+        const item = q.items![i];
+        const img = q.itemImages?.[i];
+        
         doc.text(`(   ) ${cleanText(item)}`, margin + 5, yPos);
         yPos += 6;
-      });
+        
+        if (img) {
+          try {
+            const base64Img = await getBase64ImageFromUrl(img);
+            const imgFormat = base64Img.includes("data:image/png") ? 'PNG' : 'JPEG';
+            if (yPos > 230) { doc.addPage(); yPos = 20; }
+            doc.addImage(base64Img, imgFormat, margin + 10, yPos, 30, 30);
+            yPos += 35;
+          } catch (e) {}
+        }
+      }
     } else if (q.type === "short_answer") {
       doc.text("Jawaban: ....................................................................", margin + 5, yPos);
       yPos += 8;

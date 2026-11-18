@@ -36,6 +36,12 @@ function getRandomizedExam(exam: Exam, studentId: string): Exam {
       newQ.optionImages = shuffled.map(z => z.img);
       newQ._optIdx = shuffled.map(z => z.originalIdx);
     }
+    if (newQ.type === "ordering" && newQ.items) {
+      const qSeed = studentId + q.id;
+      const zipped = newQ.items.map((item, i) => ({ text: item, img: newQ.itemImages?.[i] }));
+      newQ.items = shuffleArrayWithSeed(zipped, qSeed).map(z => z.text);
+      // Kita simpan gambar berdasarkan urutan asli, dan nanti dicari saat render
+    }
     return newQ;
   });
   return { ...exam, questions: shuffledQuestions };
@@ -153,7 +159,11 @@ export function UjianClient() {
     } else {
       const initialAnswers: Record<string, any> = {};
       randomizedExam.questions.forEach(q => {
-        if (q.type === "ordering" && q.items) initialAnswers[q.id] = shuffleArrayWithSeed(q.items, user.id + q.id);
+        if (q.type === "ordering" && q.items) {
+          // Simpan jawaban sebagai array objek { text, img }
+          const zipped = q.items.map((text, i) => ({ text, img: q.itemImages?.[i] }));
+          initialAnswers[q.id] = shuffleArrayWithSeed(zipped, user.id + q.id);
+        }
       });
 
       saveSession({
@@ -654,16 +664,21 @@ export function UjianClient() {
 
               {soal.type === "ordering" && (
                 <div className="space-y-3">
-                  {(ans && Array.isArray(ans) ? ans : soal.items || []).map((item, i, arr) => (
-                    <div key={i} className={`flex gap-4 items-center p-4 border-2 rounded-xl ${isLightMode ? 'border-slate-200 bg-white' : 'border-slate-600 bg-slate-900/50'}`}>
-                      <span className="w-8 text-center font-bold text-amber-500 text-lg">{i+1}</span>
-                      <div className={`rich-text-content flex-1 text-base prose prose-sm max-w-none ${isLightMode ? 'text-slate-700' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: item }} />
-                      <div className="flex flex-col gap-1">
-                        <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className={`p-2 rounded-lg transition disabled:opacity-30 ${isLightMode ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>▲</button>
-                        <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className={`p-2 rounded-lg transition disabled:opacity-30 ${isLightMode ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>▼</button>
+                  {(ans && Array.isArray(ans) ? ans : soal.items?.map((text, i) => ({ text, img: soal.itemImages?.[i] })) || []).map((item, i, arr) => {
+                    const text = typeof item === 'string' ? item : item.text;
+                    const img = typeof item === 'string' ? undefined : item.img;
+                    return (
+                      <div key={i} className={`flex gap-4 items-center p-4 border-2 rounded-xl ${isLightMode ? 'border-slate-200 bg-white' : 'border-slate-600 bg-slate-900/50'}`}>
+                        <span className="w-8 text-center font-bold text-amber-500 text-lg">{i+1}</span>
+                        {img && <img src={img} className="h-16 object-contain bg-white rounded-lg p-1 border border-slate-300" />}
+                        <div className={`rich-text-content flex-1 text-base prose prose-sm max-w-none ${isLightMode ? 'text-slate-700' : 'text-slate-200'}`} dangerouslySetInnerHTML={{ __html: text }} />
+                        <div className="flex flex-col gap-1">
+                          <button disabled={i===0} onClick={() => { const newArr = [...arr]; [newArr[i-1], newArr[i]] = [newArr[i], newArr[i-1]]; updateJawaban(soal.id, newArr); }} className={`p-2 rounded-lg transition disabled:opacity-30 ${isLightMode ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>▲</button>
+                          <button disabled={i===arr.length-1} onClick={() => { const newArr = [...arr]; [newArr[i+1], newArr[i]] = [newArr[i], newArr[i+1]]; updateJawaban(soal.id, newArr); }} className={`p-2 rounded-lg transition disabled:opacity-30 ${isLightMode ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>▼</button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

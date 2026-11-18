@@ -17,7 +17,7 @@ export type Question = {
   // PG Tunggal & Kompleks
   options?: string[];
   optionImages?: (string | undefined)[];
-  _optIdx?: number[]; // <-- TAMBAHKAN INI UNTUK MELACAK URUTAN ASLI SAAT DIACAK
+  _optIdx?: number[]; 
   correctAnswer?: string;
   correctAnswers?: string[];
   
@@ -27,7 +27,7 @@ export type Question = {
   // B/S Bertingkat
   statements?: { text: string; isTrue: boolean }[];
   
-  // Menjodohkan (Ditambah Gambar)
+  // Menjodohkan
   pairs?: { 
     left: string; 
     right: string; 
@@ -35,8 +35,9 @@ export type Question = {
     rightImage?: string; 
   }[];
   
-  // Mengurutkan
+  // Mengurutkan (Tambahan itemImages)
   items?: string[];
+  itemImages?: (string | undefined)[];
   
   // Isian Singkat
   acceptedAnswers?: string[];
@@ -44,7 +45,7 @@ export type Question = {
   // Esai
   minWords?: number;
 
-  // Bank Soal (Opsional)
+  // Bank Soal
   examId?: string | null;
   ownerId?: string;
   subject?: string;
@@ -55,7 +56,7 @@ export type Exam = {
   id: string;
   title: string;
   subject: string;
-  duration: number; // dalam detik
+  duration: number;
   questions: Question[];
   createdAt: string;
   isActive: boolean;

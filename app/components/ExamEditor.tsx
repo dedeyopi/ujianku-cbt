@@ -35,7 +35,7 @@ function createEmptyQuestion(type: QuestionType): Question {
   if (type === "true_false") return { ...base, trueFalseAnswer: true };
   if (type === "multi_true_false") return { ...base, statements: [{ text: "", isTrue: true }, { text: "", isTrue: false }] };
   if (type === "matching") return { ...base, pairs: [{ left: "", right: "" }, { left: "", right: "" }] };
-  if (type === "ordering") return { ...base, items: ["", "", ""] };
+  if (type === "ordering") return { ...base, items: ["", "", ""], itemImages: [undefined, undefined, undefined] };
   if (type === "short_answer") return { ...base, acceptedAnswers: [""] };
   return base;
 }
@@ -129,6 +129,12 @@ export function ExamEditor({ examId }: Props) {
        const opts = editingQuestion.options || [];
        const hasEmptyOpt = opts.some((opt, i) => !opt.replace(/<[^>]*>?/gm, '').trim() && !editingQuestion.optionImages?.[i]);
        if (hasEmptyOpt) return alert("Semua pilihan harus diisi teks atau gambarnya.");
+    }
+
+    if (editingQuestion.type === "ordering") {
+       const items = editingQuestion.items || [];
+       const hasEmptyItem = items.some((item, i) => !item.trim() && !editingQuestion.itemImages?.[i]);
+       if (hasEmptyItem) return alert("Semua item mengurutkan harus diisi teks atau gambarnya.");
     }
 
     if (isNewQuestion) updateExam({ questions: [...exam.questions, editingQuestion] });
@@ -229,10 +235,9 @@ export function ExamEditor({ examId }: Props) {
         </div>
       </header>
 
-      {/* LAYOUT SPLIT-SCREEN */}
       <div className="flex-1 max-w-7xl mx-auto w-full flex flex-col lg:flex-row gap-6 p-6 overflow-hidden">
         
-        {/* KOLOM KIRI: INFO UJIAN & DAFTAR SOAL (Bisa di-scroll) */}
+        {/* KOLOM KIRI: INFO UJIAN & DAFTAR SOAL */}
         <div className="lg:w-5/12 flex flex-col h-full overflow-hidden">
           <div className="overflow-y-auto pr-2 space-y-6 pb-10">
             <Card className="p-6">
@@ -461,16 +466,24 @@ export function ExamEditor({ examId }: Props) {
                 )}
 
                 {editingQuestion.type === "ordering" && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-slate-500">Masukkan item sesuai urutan yang BENAR.</p>
+                  <div className="space-y-3">
+                    <p className="text-xs text-slate-500">Masukkan item sesuai urutan yang BENAR. Anda bisa menambahkan gambar.</p>
                     {editingQuestion.items?.map((it, i) => (
-                      <div key={i} className="flex gap-2 items-center">
-                        <span className="w-6 text-center font-bold text-slate-400">{i+1}.</span>
-                        <input value={it} onChange={(e) => { const items = [...(editingQuestion.items||[])]; items[i] = e.target.value; setEditingQuestion({...editingQuestion, items}) }} className="flex-1 px-3 py-2 border rounded-lg" />
-                        <button onClick={() => { const items = editingQuestion.items?.filter((_,idx) => idx !== i); setEditingQuestion({...editingQuestion, items}) }} className="text-red-500"><Trash2 className="w-4 h-4"/></button>
+                      <div key={i} className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl shadow-sm">
+                        <div className="flex gap-2 items-center">
+                          <span className="w-6 text-center font-bold text-slate-400">{i+1}.</span>
+                          <input value={it} onChange={(e) => { const items = [...(editingQuestion.items||[])]; items[i] = e.target.value; setEditingQuestion({...editingQuestion, items}) }} placeholder={`Teks Item ${i+1}`} className="flex-1 px-3 py-2 border rounded-lg" />
+                          <button onClick={() => setShowOptImage(prev => ({...prev, [`ord-${i}`]: !prev[`ord-${i}`]}))} className={`p-2 rounded-lg border ${showOptImage[`ord-${i}`] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} title="Tambah Gambar"><ImageIcon className="w-4 h-4"/></button>
+                          <button onClick={() => { const items = editingQuestion.items?.filter((_,idx) => idx !== i); const imgs = editingQuestion.itemImages?.filter((_,idx) => idx !== i); setEditingQuestion({...editingQuestion, items, itemImages: imgs}) }} className="text-red-500 p-2 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                        </div>
+                        {showOptImage[`ord-${i}`] && (
+                          <div className="mt-1 pl-8">
+                            <ImageUploader value={editingQuestion.itemImages?.[i]} onChange={(img) => { const imgs = [...(editingQuestion.itemImages||[])]; imgs[i] = img; setEditingQuestion({...editingQuestion, itemImages: imgs}) }} />
+                          </div>
+                        )}
                       </div>
                     ))}
-                    <Button variant="secondary" size="sm" onClick={() => setEditingQuestion({...editingQuestion, items: [...(editingQuestion.items||[]), ""]})}><Plus className="w-3 h-3 mr-1"/>Tambah Item</Button>
+                    <Button variant="secondary" size="sm" onClick={() => setEditingQuestion({...editingQuestion, items: [...(editingQuestion.items||[]), ""], itemImages: [...(editingQuestion.itemImages||[]), undefined]})}><Plus className="w-3 h-3 mr-1"/>Tambah Item</Button>
                   </div>
                 )}
 
@@ -511,7 +524,6 @@ export function ExamEditor({ examId }: Props) {
 
       </div>
 
-      {/* MODAL BANK SOAL */}
       {bankModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 sm:p-6">
           <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col animate-fade-in-up">
